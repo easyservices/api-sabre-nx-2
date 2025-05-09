@@ -1,4 +1,9 @@
 
+<!--
+Copyright (c) 2025 harokku999@gmail.com
+Licensed under the MIT License - https://opensource.org/licenses/MIT
+-->
+
 ## 🔗 Seamless Integration with Nextcloud through REST/JSON APIs
 
 We are proud to introduce a powerful extension for Nextcloud that revolutionizes how applications interact with its core calendaring and contact services.

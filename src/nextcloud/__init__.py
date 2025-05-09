@@ -1,3 +1,6 @@
+# Copyright (c) 2025 harokku999@gmail.com
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+
 # Error messages
 API_ERR_AUTH_FAILED = "Incorrect username or password"
 API_ERR_DATE_INVALID = "Invalid format date. Use YYYYMMDDTHHMMSSZ"

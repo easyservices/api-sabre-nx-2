@@ -1,3 +1,6 @@
+# Copyright (c) 2025 harokku999@gmail.com
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 

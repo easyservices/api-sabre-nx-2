@@ -1,3 +1,6 @@
+# Copyright (c) 2025 harokku999@gmail.com
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+
 """Security utilities for authentication and authorization.
 
 This module provides utility functions for handling security-related operations

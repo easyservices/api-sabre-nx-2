@@ -1,3 +1,6 @@
+# Copyright (c) 2025 harokku999@gmail.com
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+
 ## Base URL for the Nextcloud instance
 ## This URL is used to access the Nextcloud API and to generate download links for files
 ## stored in Nextcloud.
