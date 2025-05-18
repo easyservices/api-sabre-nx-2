@@ -27,3 +27,4 @@ env/
 # Project-specific
 src/common/config.py
 src/nextcloud/config.py
+fastapi_server.service
