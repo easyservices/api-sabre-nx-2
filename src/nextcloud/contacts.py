@@ -2,10 +2,57 @@
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 
 """
-Nextcloud CardDAV contacts module.
+Nextcloud CardDAV Contacts Integration Module
 
-This module provides functions to interact with Nextcloud CardDAV contacts.
-It includes functionality to retrieve and search contacts from a Nextcloud server.
+This module provides comprehensive CardDAV protocol implementation for managing
+contacts in Nextcloud servers. It handles all CRUD operations, search functionality,
+and vCard format conversion for seamless contact management.
+
+**CardDAV Protocol Implementation:**
+- **RFC 6352 Compliance**: Full CardDAV specification support
+- **vCard Processing**: Automatic conversion between JSON and vCard formats
+- **WebDAV Operations**: REPORT, GET, PUT, DELETE request handling
+- **Server Communication**: Asynchronous HTTP operations with proper error handling
+
+**Key Features:**
+- **Contact Retrieval**: Get all contacts or specific contacts by UID
+- **Contact Search**: Advanced server-side filtering with multiple criteria
+- **Contact Management**: Create, update, and delete operations
+- **Format Conversion**: Seamless vCard ↔ JSON transformation
+- **Error Handling**: Comprehensive exception management with proper HTTP status codes
+
+**Supported Operations:**
+- `get_all_contacts()`: Bulk contact retrieval from addressbook
+- `get_contact_by_uid()`: Single contact lookup by unique identifier
+- `search_contacts()`: Advanced filtering with multiple search criteria
+- `create_contact()`: New contact creation with automatic UID generation
+- `update_contact()`: Existing contact modification with conflict detection
+- `delete_contact()`: Contact removal with proper cleanup
+
+**vCard Support:**
+- **Standard Fields**: Name, email, phone, address, birthday, notes
+- **Extended Properties**: Groups, categories, custom fields
+- **Multiple Values**: Support for multiple emails, phones, addresses
+- **Type Tags**: Proper handling of field types (home, work, cell, etc.)
+
+**Authentication & Security:**
+- HTTP Basic Authentication with Nextcloud credentials
+- Secure credential handling and validation
+- Proper authorization checking for addressbook access
+
+**Performance Optimizations:**
+- Asynchronous operations for non-blocking I/O
+- Efficient XML parsing and generation
+- Minimal data transfer with targeted queries
+- Connection pooling for HTTP requests
+
+**Error Handling:**
+Comprehensive error management with appropriate HTTP status codes:
+- 400: Invalid request data or parameters
+- 401: Authentication failures
+- 403: Authorization/permission issues
+- 404: Contact or addressbook not found
+- 503: Server communication errors
 """
 
 from fastapi import HTTPException
@@ -31,7 +78,7 @@ from src.nextcloud.libs.carddav_helpers import (
 IS_DEBUG = False  # Set to True for debugging - be aware of sensitive data in logs
 
 
-async def get_all_contacts(credentials: HTTPBasicCredentials) -> List[Contact]:
+async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: Optional[str] = None) -> List[Contact]:
     """
     Retrieve all contacts from the specified Nextcloud CardDAV addressbook.
     
@@ -51,7 +98,8 @@ async def get_all_contacts(credentials: HTTPBasicCredentials) -> List[Contact]:
     - vCard URI
 
     Args:
-        user_settings (Settings): User settings containing Nextcloud credentials and URLs.
+        credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
+        addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
 
     Returns:
         List[Contact]: List of Contact objects parsed from vCard data.
@@ -66,7 +114,7 @@ async def get_all_contacts(credentials: HTTPBasicCredentials) -> List[Contact]:
     if IS_DEBUG:
         print(f"get_all_contacts: User info: {user_info}")
     
-    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'])
+    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
     if IS_DEBUG:
         print(f"get_all_contacts: carddav_url: {carddav_url}")
 
@@ -91,10 +139,19 @@ async def get_all_contacts(credentials: HTTPBasicCredentials) -> List[Contact]:
                 
                 # Parse vCards to Contact objects
                 contacts = []
-                for item in parsed_data:
-                    contact = parse_vcard_to_contact(item['vcard_data'], item['href'])
-                    if contact:
-                        contacts.append(contact)
+                for i, item in enumerate(parsed_data):
+                    try:
+                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'])
+                        if contact:
+                            contacts.append(contact)
+                        else:
+                            print(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
+                    except Exception as e:
+                        print(f"Error parsing contact #{i+1}: {e}")
+                        print(f"Contact href: {item.get('href', 'Unknown')}")
+                        print(f"vCard data (first 200 chars): {item.get('vcard_data', '')[:200]}")
+                        # Continue processing other contacts instead of failing completely
+                        continue
                 
                 return contacts
                 
@@ -104,7 +161,8 @@ async def get_all_contacts(credentials: HTTPBasicCredentials) -> List[Contact]:
 
 async def search_contacts(
     credentials: HTTPBasicCredentials,
-    search_criteria: ContactSearchCriteria
+    search_criteria: ContactSearchCriteria,
+    addressbook_name: Optional[str] = None
 ) -> List[Contact]:
     """
     Search for contacts from the specified Nextcloud CardDAV addressbook based on search criteria.
@@ -117,6 +175,7 @@ async def search_contacts(
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         search_criteria (ContactSearchCriteria): Pydantic model containing search criteria.
             All fields are optional and case-insensitive partial matches are used for string fields.
+        addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
     
     Returns:
         List[Contact]: List of Contact objects that match the search criteria.
@@ -131,7 +190,7 @@ async def search_contacts(
     if IS_DEBUG:
         print(f"search_contacts: User info: {user_info}")
     
-    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'])
+    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
     if IS_DEBUG:
         print(f"search_contacts: carddav_url: {carddav_url}")
     
@@ -163,10 +222,19 @@ async def search_contacts(
                 
                 # Parse vCards to Contact objects
                 contacts = []
-                for item in parsed_data:
-                    contact = parse_vcard_to_contact(item['vcard_data'], item['href'])
-                    if contact:
-                        contacts.append(contact)
+                for i, item in enumerate(parsed_data):
+                    try:
+                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'])
+                        if contact:
+                            contacts.append(contact)
+                        else:
+                            print(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
+                    except Exception as e:
+                        print(f"Error parsing contact #{i+1}: {e}")
+                        print(f"Contact href: {item.get('href', 'Unknown')}")
+                        print(f"vCard data (first 200 chars): {item.get('vCard_data', '')[:200]}")
+                        # Continue processing other contacts instead of failing completely
+                        continue
                 
                 return contacts
                 
@@ -174,7 +242,7 @@ async def search_contacts(
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def create_contact(credentials: HTTPBasicCredentials, contact: Contact) -> Contact:
+async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, addressbook_name: Optional[str] = None) -> Contact:
     """
     Create a new contact in the specified Nextcloud CardDAV addressbook.
     
@@ -187,6 +255,7 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact) ->
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         contact (Contact): The Contact object to create.
+        addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
         
     Returns:
         Contact: The created Contact object with updated information (like UID and vcs_uri).
@@ -211,7 +280,7 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact) ->
     # Make sure to handle URL joining properly
     
     # Ensure the carddav_url ends with a slash
-    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'])
+    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
     if IS_DEBUG:
         print(f"create_contact: carddav_url: {carddav_url}")
     base_url = carddav_url if carddav_url.endswith('/') else f"{carddav_url}/"
@@ -258,7 +327,7 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact) ->
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def update_contact(credentials: HTTPBasicCredentials, contact: Contact) -> Contact:
+async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, addressbook_name: Optional[str] = None) -> Contact:
     """
     Update an existing contact in the specified Nextcloud CardDAV addressbook.
     
@@ -273,6 +342,7 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact) ->
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         contact (Contact): The Contact object to update.
+        addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
         
     Returns:
         Contact: The updated Contact object.
@@ -288,7 +358,7 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact) ->
     if IS_DEBUG:
         print(f"update_contact: User info: {user_info}")
     
-    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'])
+    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
     if IS_DEBUG:
         print(f"update_contact: carddav_url: {carddav_url}")
     
@@ -346,7 +416,7 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact) ->
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def delete_contact(credentials: HTTPBasicCredentials, uid: str) -> Dict[str, str]:
+async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressbook_name: Optional[str] = None) -> Dict[str, str]:
     """
     Delete a contact from the specified Nextcloud CardDAV addressbook.
     
@@ -356,6 +426,7 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str) -> Dict[st
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         uid (str): The UID of the contact to delete.
+        addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
         
     Returns:
         Dict[str, str]: A dictionary with a success message.
@@ -371,7 +442,7 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str) -> Dict[st
     if IS_DEBUG:
         print(f"delete_contact: User info: {user_info}")
     
-    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'])
+    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
     if IS_DEBUG:
         print(f"delete_contact: carddav_url: {carddav_url}")
     
@@ -420,7 +491,7 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str) -> Dict[st
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str) -> Optional[Contact]:
+async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addressbook_name: Optional[str] = None) -> Optional[Contact]:
     """
     Retrieve a single contact by its UID from the specified Nextcloud CardDAV addressbook.
     
@@ -431,6 +502,7 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str) -> Opt
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         uid (str): The UID of the contact to retrieve.
+        addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
         
     Returns:
         Optional[Contact]: The Contact object if found, None otherwise.
@@ -446,7 +518,7 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str) -> Opt
     if IS_DEBUG:
         print(f"get_contact_by_uid: User info: {user_info}")
     
-    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'])
+    carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
     if IS_DEBUG:
         print(f"get_contact_by_uid: carddav_url: {carddav_url}")
     

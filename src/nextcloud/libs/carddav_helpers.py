@@ -130,7 +130,7 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optio
     try:
         vcard = vobject.readOne(vcard_data)
         
-        # Extract UID
+        # Extract UID for debugging purposes
         uid = str(vcard.uid.value) if hasattr(vcard, 'uid') else ""
         
         # Extract name information
@@ -141,28 +141,59 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optio
         if hasattr(vcard, 'email_list'):
             for e in vcard.email_list:
                 if hasattr(e, 'value'):
-                    emails.append(Email(email=str(e.value), tag=str(e.type_param)))
+                    try:
+                        # Safely extract type_param
+                        tag = str(e.type_param) if hasattr(e, 'type_param') and e.type_param is not None else ""
+                        emails.append(Email(email=str(e.value), tag=tag))
+                    except Exception as email_error:
+                        print(f"Error parsing email for contact UID {uid}: {email_error}")
+                        print(f"Email object: {e}")
+                        # Add email without tag as fallback
+                        emails.append(Email(email=str(e.value), tag=""))
         
         # Extract phone numbers
         phones = []
         if hasattr(vcard, 'tel_list'):
             for p in vcard.tel_list:
                 if hasattr(p, 'value'):
-                    phones.append(Phone(number=str(p.value), tag=str(p.type_param)))
+                    try:
+                        # Safely extract type_param
+                        tag = str(p.type_param) if hasattr(p, 'type_param') and p.type_param is not None else ""
+                        phones.append(Phone(number=str(p.value), tag=tag))
+                    except Exception as phone_error:
+                        print(f"Error parsing phone for contact UID {uid}: {phone_error}")
+                        print(f"Phone object: {p}")
+                        # Add phone without tag as fallback
+                        phones.append(Phone(number=str(p.value), tag=""))
         
         # Extract addresses
         addresses = []
         if hasattr(vcard, 'adr_list'):
             for adr in vcard.adr_list:
                 if hasattr(adr, 'value'):
-                    addresses.append(Address(
-                        street=str(adr.value.street) if hasattr(adr.value, 'street') else None,
-                        city=str(adr.value.city) if hasattr(adr.value, 'city') else None,
-                        state=str(adr.value.region) if hasattr(adr.value, 'region') else None,
-                        postal_code=str(adr.value.code) if hasattr(adr.value, 'code') else None,
-                        country=str(adr.value.country) if hasattr(adr.value, 'country') else None,
-                        tag=str(adr.type_param)
-                    ))
+                    try:
+                        # Safely extract type_param
+                        tag = str(adr.type_param) if hasattr(adr, 'type_param') and adr.type_param is not None else ""
+                        addresses.append(Address(
+                            street=str(adr.value.street) if hasattr(adr.value, 'street') else None,
+                            city=str(adr.value.city) if hasattr(adr.value, 'city') else None,
+                            state=str(adr.value.region) if hasattr(adr.value, 'region') else None,
+                            postal_code=str(adr.value.code) if hasattr(adr.value, 'code') else None,
+                            country=str(adr.value.country) if hasattr(adr.value, 'country') else None,
+                            tag=tag
+                        ))
+                    except Exception as address_error:
+                        print(f"Error parsing address for contact UID {uid}: {address_error}")
+                        print(f"Address object: {adr}")
+                        # Add address without tag as fallback
+                        addresses.append(Address(
+                            street=str(adr.value.street) if hasattr(adr.value, 'street') else None,
+                            city=str(adr.value.city) if hasattr(adr.value, 'city') else None,
+                            state=str(adr.value.region) if hasattr(adr.value, 'region') else None,
+                            postal_code=str(adr.value.code) if hasattr(adr.value, 'code') else None,
+                            country=str(adr.value.country) if hasattr(adr.value, 'country') else None,
+                            tag=""
+                        ))
         
         # Extract birthday and format as YYYY-MM-DD
         birthday = None
@@ -241,6 +272,10 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optio
     
     except Exception as e:
         print(f"Error parsing vCard: {e}")
+        print(f"Contact UID: {uid if 'uid' in locals() else 'Unknown'}")
+        print(f"Contact full_name: {full_name if 'full_name' in locals() else 'Unknown'}")
+        print(f"vCard href: {href}")
+        print(f"vCard data (first 500 chars): {vcard_data[:500] if vcard_data else 'None'}")
         return None
 
 

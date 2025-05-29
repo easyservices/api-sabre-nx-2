@@ -14,40 +14,6 @@ The module includes:
 - Email: Email address with type tag
 - Phone: Phone number with type tag
 - ContactSearchCriteria: Model for specifying search parameters
-
-JSON Example of a Contact:
-```json
-{
-  "uid": "550e8400-e29b-41d4-a716-446655440000",
-  "full_name": "John Doe",
-  "vcs_uri": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/username/contacts/550e8400-e29b-41d4-a716-446655440000.vcf",
-  "emails": [
-    {
-      "tag": "work",
-      "email": "john.doe@example.com"
-    }
-  ],
-  "phones": [
-    {
-      "tag": "cell",
-      "number": "+1-555-123-4567"
-    }
-  ],
-  "addresses": [
-    {
-      "tag": "home",
-      "street": "123 Main St",
-      "city": "Anytown",
-      "state": "CA",
-      "postal_code": "12345",
-      "country": "USA"
-    }
-  ],
-  "birthday": "1980-01-01",
-  "notes": "Project manager",
-  "groups": ["friends", "work"]
-}
-```
 """
 
 from typing import List, Optional, Literal
@@ -88,24 +54,7 @@ class Contact(BaseModel):
     This model contains all the information about a contact, including personal details,
     communication methods, and organizational information. It maps to a vCard in the
     CardDAV protocol.
-    
-    Example:
-    ```python
-    # Create a contact with a manually specified UID
-    contact = Contact(
-        uid="123456",
-        full_name="John Doe",
-        emails=[Email(tag="work", email="john.doe@example.com")],
-        phones=[Phone(tag="cell", number="+1-555-123-4567")]
-    )
-    
-    # Create a contact with an auto-generated UUID
-    contact = Contact(
-        uid=Contact.generate_uid(),
-        full_name="Jane Smith",
-        emails=[Email(tag="personal", email="jane.smith@example.com")]
-    )
-    ```
+  
     """
     uid: str = Field(..., description="Unique identifier for the contact")
     full_name: str = Field(..., description="Full name of the contact")
@@ -136,40 +85,7 @@ class ContactSearchCriteria(BaseModel):
     
     The search_type field determines whether to use OR logic ("anyof") or AND logic ("allof")
     when multiple search criteria are provided.
-    
-    Python Example:
-    ```python
-    # Search for contacts with "John" in their name OR "example.com" in their email
-    criteria = ContactSearchCriteria(
-        full_name="John",
-        email="example.com",
-        search_type="anyof"
-    )
-    
-    # Search for contacts with "Smith" in their name AND "New York" in their address
-    criteria = ContactSearchCriteria(
-        full_name="Smith",
-        address="New York",
-        search_type="allof"
-    )
-    ```
-    
-    JSON Example:
-    ```json
-    {
-      "full_name": "John",
-      "email": "example.com",
-      "search_type": "anyof"
-    }
-    ```
-    
-    ```json
-    {
-      "full_name": "Smith",
-      "address": "New York",
-      "search_type": "allof"
-    }
-    ```
+
     """
     uid: Optional[str] = Field(None, description="Search by contact UID (case-insensitive partial match)")
     full_name: Optional[str] = Field(None, description="Search by contact's full name (case-insensitive partial match)")

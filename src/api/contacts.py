@@ -1,7 +1,7 @@
 # Copyright (c) 2025 harokku999@gmail.com
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Path
 from typing import List
 
 from fastapi.security import HTTPBasicCredentials
@@ -9,6 +9,7 @@ from src.common import security
 
 from src.common.sec import authenticate_with_nextcloud
 from src.models.contact import Contact, ContactSearchCriteria
+from src.models.api_params import UidParam
 from src.nextcloud.contacts import get_all_contacts, search_contacts, create_contact, update_contact, delete_contact, get_contact_by_uid
 
 
@@ -19,11 +20,61 @@ IS_DEBUG = False
 # instead of applying validate_api_key to all routes
 router = APIRouter()
 
-# --- Endpoints ---
-# Each endpoint uses the get_user_settings dependency to get the user settings
-# directly from the API key provided in the X-API-Key header
-
-@router.post("/", operation_id="create_contact", response_model=Contact)
+@router.post(
+    "/",
+    operation_id="create_contact",
+    response_model=Contact,
+    status_code=201,
+    summary="Create a new contact",
+    description="Create a new contact in the Nextcloud CardDAV addressbook",
+    responses={
+        201: {
+            "description": "Contact created successfully",
+            "model": Contact,
+        },
+        400: {
+            "description": "Invalid contact data",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid contact data provided"}
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid credentials"}
+                }
+            },
+        },
+        403: {
+            "description": "Authorization refused",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Access denied to addressbook"}
+                }
+            },
+        },
+        404: {
+            "description": "Addressbook not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Addressbook not found"}
+                }
+            },
+        },
+        503: {
+            "description": "Server error or connection issue",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Could not create contact: Connection failed"}
+                }
+            },
+        },
+    },
+    tags=["contacts"],
+)
 async def create_contact_endpoint(
     contact: Contact,
     credentials: HTTPBasicCredentials = Depends(security)
@@ -31,91 +82,28 @@ async def create_contact_endpoint(
     """
     Create a new contact in the Nextcloud CardDAV addressbook.
     
-    This endpoint creates a new contact in the specified Nextcloud addressbook
-    using the CardDAV protocol. It converts the Contact object to a vCard and
-    sends it to the server using a PUT request.
+    Creates a new contact using the CardDAV protocol. The contact data is converted
+    to vCard format and stored in the specified Nextcloud addressbook.
     
-    If the contact doesn't have a UID, a new UUID will be generated automatically.
+    **Key Features:**
+    - Automatic UID generation if not provided
+    - Full vCard format support
+    - CardDAV protocol compliance
+    - Comprehensive contact information storage
     
-    Authentication:
-        HTTP Basic Authentication with Nextcloud credentials
+    **Authentication:**
+    Requires HTTP Basic Authentication with valid Nextcloud credentials.
     
-    Returns:
-        Contact: The created Contact object with updated information (like UID and vcs_uri)
+    **Contact Information Supported:**
+    - Personal details (name, birthday, notes)
+    - Multiple email addresses with type tags
+    - Multiple phone numbers with type tags
+    - Multiple physical addresses with full details
+    - Group/category assignments
     
-    Raises:
-        HTTPException(401): If authentication fails
-        HTTPException(403): If authorization is refused
-        HTTPException(404): If the addressbook is not found
-        HTTPException(503): If there's a server error or connection issue
-    
-    Example Request:
-        POST /contacts/
-        Headers:
-            Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
-            Content-Type: application/json
-        Body:
-            {
-              "uid": "550e8400-e29b-41d4-a716-446655440000",
-              "full_name": "John Doe",
-              "emails": [
-                {
-                  "tag": "work",
-                  "email": "john.doe@example.com"
-                }
-              ],
-              "phones": [
-                {
-                  "tag": "cell",
-                  "number": "+1-555-123-4567"
-                }
-              ],
-              "addresses": [
-                {
-                  "tag": "home",
-                  "street": "123 Main St",
-                  "city": "Anytown",
-                  "state": "CA",
-                  "postal_code": "12345",
-                  "country": "USA"
-                }
-              ],
-              "birthday": "1980-01-01",
-              "notes": "Project manager",
-              "groups": ["friends", "work"]
-            }
-            
-    Example Response:
-            {
-              "uid": "550e8400-e29b-41d4-a716-446655440000",
-              "full_name": "John Doe",
-              "vcs_uri": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/username/contacts/550e8400-e29b-41d4-a716-446655440000.vcf",
-              "emails": [
-                {
-                  "tag": "work",
-                  "email": "john.doe@example.com"
-                }
-              ],
-              "phones": [
-                {
-                  "tag": "cell",
-                  "number": "+1-555-123-4567"
-                }
-              ],
-              "addresses": [
-                {
-                  "tag": "home",
-                  "street": "123 Main St",
-                  "city": "Anytown",
-                  "state": "CA",
-                  "postal_code": "12345",
-                  "country": "USA"
-                }
-              ],
-              "birthday": "1980-01-01",
-              "notes": "Project manager",
-              "groups": ["friends", "work"]
-            }
+    **UID Handling:**
+    If no UID is provided in the request, a UUID4 will be automatically generated.
+    The UID must be unique within the addressbook.
     """
     try:
         if IS_DEBUG:
@@ -141,68 +129,95 @@ async def create_contact_endpoint(
 
 
 
-@router.get("/{uid}", operation_id="get_contact_by_uid", response_model=Contact)
+@router.get(
+    "/{uid}",
+    operation_id="get_contact_by_uid",
+    response_model=Contact,
+    summary="Get contact by UID",
+    description="Retrieve a single contact by its unique identifier",
+    responses={
+        200: {
+            "description": "Contact retrieved successfully",
+            "model": Contact,
+        },
+        400: {
+            "description": "Invalid UID format",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid UID format provided"}
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid credentials"}
+                }
+            },
+        },
+        403: {
+            "description": "Authorization refused",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Access denied to addressbook"}
+                }
+            },
+        },
+        404: {
+            "description": "Contact not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Contact with UID 550e8400-e29b-41d4-a716-446655440000 not found"}
+                }
+            },
+        },
+        503: {
+            "description": "Server error or connection issue",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Could not retrieve contact: Connection failed"}
+                }
+            },
+        },
+    },
+    tags=["contacts"],
+)
 async def read_contact_endpoint(
-    uid: str,
+    uid: str = Path(
+        ...,
+        description="Unique identifier for the contact",
+        example="550e8400-e29b-41d4-a716-446655440000",
+        min_length=1,
+        max_length=255,
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
     Retrieve a single contact by its UID from the Nextcloud CardDAV addressbook.
     
-    This endpoint performs a CardDAV GET request to retrieve a specific contact by its UID
-    from the specified Nextcloud addressbook. It requires HTTP Basic Authentication with
-    Nextcloud credentials.
+    Performs a CardDAV GET request to fetch a specific contact using its unique identifier.
+    The contact data is retrieved from the Nextcloud server and converted from vCard format
+    to a structured Contact object.
     
-    The contact is identified by its UID, which must be provided in the URL path.
+    **Key Features:**
+    - Direct contact retrieval by UID
+    - Full contact information including all fields
+    - CardDAV protocol compliance
+    - Efficient single-contact lookup
     
-    Authentication:
-        HTTP Basic Authentication with Nextcloud credentials
+    **Authentication:**
+    Requires HTTP Basic Authentication with valid Nextcloud credentials.
     
-    Returns:
-        Contact: The Contact object if found
+    **UID Requirements:**
+    - Must be a non-empty string
+    - Should be a valid UUID or unique identifier
+    - Case-sensitive matching
+    - Maximum length of 255 characters
     
-    Raises:
-        HTTPException(401): If authentication fails
-        HTTPException(403): If authorization is refused
-        HTTPException(404): If the contact is not found
-        HTTPException(503): If there's a server error or connection issue
-    
-    Example Request:
-        GET /contacts/550e8400-e29b-41d4-a716-446655440000
-        Headers:
-            Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
-            
-    Example Response:
-        {
-          "uid": "550e8400-e29b-41d4-a716-446655440000",
-          "full_name": "John Doe",
-          "vcs_uri": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/username/contacts/550e8400-e29b-41d4-a716-446655440000.vcf",
-          "emails": [
-            {
-              "tag": "work",
-              "email": "john.doe@example.com"
-            }
-          ],
-          "phones": [
-            {
-              "tag": "cell",
-              "number": "+1-555-123-4567"
-            }
-          ],
-          "addresses": [
-            {
-              "tag": "home",
-              "street": "123 Main St",
-              "city": "Anytown",
-              "state": "CA",
-              "postal_code": "12345",
-              "country": "USA"
-            }
-          ],
-          "birthday": "1980-01-01",
-          "notes": "Project manager",
-          "groups": ["friends", "work"]
-        }
+    **Returned Data:**
+    Complete contact information including personal details, communication methods,
+    addresses, and organizational data as stored in the CardDAV server.
     """
     try:
         if IS_DEBUG:
@@ -235,103 +250,108 @@ async def read_contact_endpoint(
 
 
 
-@router.put("/{uid}", operation_id="update_contact_by_uid", response_model=Contact)
+@router.put(
+    "/{uid}",
+    operation_id="update_contact_by_uid",
+    response_model=Contact,
+    summary="Update contact by UID",
+    description="Update an existing contact in the Nextcloud CardDAV addressbook",
+    responses={
+        200: {
+            "description": "Contact updated successfully",
+            "model": Contact,
+        },
+        400: {
+            "description": "Invalid request data or UID mismatch",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "uid_mismatch": {
+                            "summary": "UID mismatch",
+                            "value": {"detail": "UID in path (123) doesn't match contact UID (456)"}
+                        },
+                        "invalid_data": {
+                            "summary": "Invalid contact data",
+                            "value": {"detail": "Invalid contact data provided"}
+                        }
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid credentials"}
+                }
+            },
+        },
+        403: {
+            "description": "Authorization refused",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Access denied to addressbook"}
+                }
+            },
+        },
+        404: {
+            "description": "Contact not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Contact with UID 550e8400-e29b-41d4-a716-446655440000 not found"}
+                }
+            },
+        },
+        503: {
+            "description": "Server error or connection issue",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Could not update contact: Connection failed"}
+                }
+            },
+        },
+    },
+    tags=["contacts"],
+)
 async def update_contact_endpoint(
-    uid: str,
     contact_update: Contact,
+    uid: str = Path(
+        ...,
+        description="Unique identifier for the contact",
+        example="550e8400-e29b-41d4-a716-446655440000",
+        min_length=1,
+        max_length=255,
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
     Update an existing contact in the Nextcloud CardDAV addressbook.
     
-    This endpoint updates an existing contact in the specified Nextcloud addressbook
-    using the CardDAV protocol. It converts the Contact object to a vCard and
-    sends it to the server using a PUT request.
+    Updates an existing contact using the CardDAV protocol. The contact data is converted
+    to vCard format and replaces the existing contact on the Nextcloud server.
     
-    The contact must have a valid UID that matches the UID in the URL path.
-    If the contact has a vcs_uri, it will be used as the update URL. Otherwise,
-    the function will construct a URL based on the user's Nextcloud addressbook URL and the contact's UID.
+    **Key Features:**
+    - Complete contact replacement (not partial updates)
+    - UID validation and consistency checking
+    - CardDAV protocol compliance
+    - Automatic vCard format conversion
     
-    Authentication:
-        HTTP Basic Authentication with Nextcloud credentials
+    **Authentication:**
+    Requires HTTP Basic Authentication with valid Nextcloud credentials.
     
-    Returns:
-        Contact: The updated Contact object
+    **UID Consistency:**
+    The UID in the URL path must match the UID in the request body. This ensures
+    data integrity and prevents accidental overwrites.
     
-    Raises:
-        HTTPException(400): If the UID in the path doesn't match the contact's UID
-        HTTPException(401): If authentication fails
-        HTTPException(403): If authorization is refused
-        HTTPException(404): If the contact is not found
-        HTTPException(503): If there's a server error or connection issue
+    **Update Behavior:**
+    - Replaces the entire contact record
+    - Preserves the original UID and vcs_uri
+    - Updates all provided fields
+    - Maintains CardDAV server timestamps
     
-    Example Request:
-        PUT /contacts/550e8400-e29b-41d4-a716-446655440000
-        Headers:
-            Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
-            Content-Type: application/json
-        Body:
-            {
-              "uid": "550e8400-e29b-41d4-a716-446655440000",
-              "full_name": "John Doe Updated",
-              "emails": [
-                {
-                  "tag": "work",
-                  "email": "john.doe.updated@example.com"
-                }
-              ],
-              "phones": [
-                {
-                  "tag": "cell",
-                  "number": "+1-555-123-4567"
-                }
-              ],
-              "addresses": [
-                {
-                  "tag": "home",
-                  "street": "123 Main St",
-                  "city": "Anytown",
-                  "state": "CA",
-                  "postal_code": "12345",
-                  "country": "USA"
-                }
-              ],
-              "birthday": "1980-01-01",
-              "notes": "Project manager - updated",
-              "groups": ["friends", "work", "vip"]
-            }
-            
-    Example Response:
-            {
-              "uid": "550e8400-e29b-41d4-a716-446655440000",
-              "full_name": "John Doe Updated",
-              "vcs_uri": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/username/contacts/550e8400-e29b-41d4-a716-446655440000.vcf",
-              "emails": [
-                {
-                  "tag": "work",
-                  "email": "john.doe.updated@example.com"
-                }
-              ],
-              "phones": [
-                {
-                  "tag": "cell",
-                  "number": "+1-555-123-4567"
-                }
-              ],
-              "addresses": [
-                {
-                  "tag": "home",
-                  "street": "123 Main St",
-                  "city": "Anytown",
-                  "state": "CA",
-                  "postal_code": "12345",
-                  "country": "USA"
-                }
-              ],
-              "birthday": "1980-01-01",
-              "notes": "Project manager - updated",
-              "groups": ["friends", "work", "vip"]
-            }
+    **URL Resolution:**
+    If the contact has a vcs_uri, it will be used for the update. Otherwise,
+    the URL is constructed from the addressbook path and contact UID.
     """
     try:
         # Ensure the UID in the path matches the contact's UID
@@ -366,38 +386,96 @@ async def update_contact_endpoint(
 
 
 
-@router.delete("/{uid}", operation_id="delete_contact_by_uid", status_code=204)
+@router.delete(
+    "/{uid}",
+    operation_id="delete_contact_by_uid",
+    status_code=204,
+    summary="Delete contact by UID",
+    description="Delete a contact from the Nextcloud CardDAV addressbook",
+    responses={
+        204: {
+            "description": "Contact deleted successfully",
+        },
+        400: {
+            "description": "Invalid UID format",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid UID format provided"}
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid credentials"}
+                }
+            },
+        },
+        403: {
+            "description": "Authorization refused",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Access denied to addressbook"}
+                }
+            },
+        },
+        404: {
+            "description": "Contact not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Contact with UID 550e8400-e29b-41d4-a716-446655440000 not found"}
+                }
+            },
+        },
+        503: {
+            "description": "Server error or connection issue",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Could not delete contact: Connection failed"}
+                }
+            },
+        },
+    },
+    tags=["contacts"],
+)
 async def delete_contact_endpoint(
-    uid: str,
+    uid: str = Path(
+        ...,
+        description="Unique identifier for the contact to delete",
+        example="550e8400-e29b-41d4-a716-446655440000",
+        min_length=1,
+        max_length=255,
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
     Delete a contact from the Nextcloud CardDAV addressbook.
     
-    This endpoint deletes a contact from the specified Nextcloud addressbook
-    using the CardDAV protocol. It sends a DELETE request to the server.
+    Permanently removes a contact from the Nextcloud server using the CardDAV protocol.
+    This operation cannot be undone.
     
-    The contact is identified by its UID, which must be provided in the URL path.
+    **Key Features:**
+    - Permanent contact deletion
+    - CardDAV protocol compliance
+    - Atomic operation (all-or-nothing)
+    - Immediate server synchronization
     
-    Authentication:
-        HTTP Basic Authentication with Nextcloud credentials
+    **Authentication:**
+    Requires HTTP Basic Authentication with valid Nextcloud credentials.
     
-    Returns:
-        204 No Content on successful deletion
+    **Deletion Process:**
+    1. Validates the provided UID format
+    2. Authenticates with the Nextcloud server
+    3. Constructs the contact URL from UID
+    4. Sends CardDAV DELETE request
+    5. Returns 204 No Content on success
     
-    Raises:
-        HTTPException(401): If authentication fails
-        HTTPException(403): If authorization is refused
-        HTTPException(404): If the contact is not found
-        HTTPException(503): If there's a server error or connection issue
-    
-    Example Request:
-        DELETE /contacts/550e8400-e29b-41d4-a716-446655440000
-        Headers:
-            Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
-            
-    Example Response:
-        HTTP/1.1 204 No Content
+    **Important Notes:**
+    - This operation is irreversible
+    - The contact will be removed from all synchronized devices
+    - Any references to this contact in other applications may become invalid
+    - The UID cannot be reused for new contacts in the same addressbook
     """
     try:
         if IS_DEBUG:
@@ -427,101 +505,87 @@ async def delete_contact_endpoint(
 
 
 
-# This endpoint fetches LIVE data from Nextcloud via get_all_contacts
-@router.get("/", operation_id="get_all_contacts", response_model=List[Contact])
+@router.get(
+    "/",
+    operation_id="get_all_contacts",
+    response_model=List[Contact],
+    summary="Get all contacts",
+    description="Retrieve all contacts from the Nextcloud CardDAV addressbook",
+    responses={
+        200: {
+            "description": "Contacts retrieved successfully",
+            "model": List[Contact],
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid credentials"}
+                }
+            },
+        },
+        403: {
+            "description": "Authorization refused",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Access denied to addressbook"}
+                }
+            },
+        },
+        404: {
+            "description": "Addressbook not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Addressbook not found"}
+                }
+            },
+        },
+        503: {
+            "description": "Server error or connection issue",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Could not retrieve contacts from backend"}
+                }
+            },
+        },
+    },
+    tags=["contacts"],
+)
 async def get_all_contacts_endpoint(
     credentials: HTTPBasicCredentials = Depends(security)
 ) -> List[Contact]:
     """
-    Retrieve all contacts from a Nextcloud CardDAV addressbook.
+    Retrieve all contacts from the Nextcloud CardDAV addressbook.
     
-    This endpoint performs a CardDAV REPORT request to retrieve all contacts from
-    the specified Nextcloud addressbook. It requires HTTP Basic Authentication with
-    Nextcloud credentials.
+    Performs a CardDAV REPORT request to fetch all contacts from the user's default
+    addressbook. Returns live data directly from the Nextcloud server.
     
-    The endpoint returns a list of Contact objects containing comprehensive contact
-    information including:
-    - UID
-    - Full name
-    - Email addresses (with tags like 'home', 'work')
-    - Phone numbers (with tags like 'cell', 'home', 'work')
-    - Physical addresses (with tags and components like street, city, etc.)
-    - Birthday (formatted as YYYY-MM-DD)
-    - Notes
-    - Groups/categories
-    - vCard URI
+    **Key Features:**
+    - Real-time data retrieval from Nextcloud
+    - Complete contact information for all contacts
+    - CardDAV protocol compliance
+    - Efficient bulk contact fetching
     
-    Authentication:
-        HTTP Basic Authentication with Nextcloud credentials
+    **Authentication:**
+    Requires HTTP Basic Authentication with valid Nextcloud credentials.
     
-    Returns:
-        List[Contact]: A list of Contact objects representing all contacts in the addressbook
+    **Returned Data Structure:**
+    Each contact includes comprehensive information:
+    - **Personal Details**: UID, full name, birthday, notes
+    - **Communication**: Multiple email addresses and phone numbers with type tags
+    - **Location**: Multiple physical addresses with complete details
+    - **Organization**: Group/category assignments
+    - **Metadata**: vCard URI for direct server access
     
-    Raises:
-        HTTPException(401): If authentication fails
-        HTTPException(403): If authorization is refused
-        HTTPException(404): If the addressbook is not found
-        HTTPException(503): If there's a server error or connection issue
+    **Performance Considerations:**
+    - Fetches all contacts in a single request
+    - May return large datasets for addressbooks with many contacts
+    - Consider using search endpoints for filtered results
+    - Response time depends on addressbook size and network conditions
     
-    Example Request:
-        GET /contacts/
-        Headers:
-            Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
-            
-    Example Response:
-        [
-          {
-            "uid": "550e8400-e29b-41d4-a716-446655440000",
-            "full_name": "John Doe",
-            "vcs_uri": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/username/contacts/550e8400-e29b-41d4-a716-446655440000.vcf",
-            "emails": [
-              {
-                "tag": "work",
-                "email": "john.doe@example.com"
-              }
-            ],
-            "phones": [
-              {
-                "tag": "cell",
-                "number": "+1-555-123-4567"
-              }
-            ],
-            "addresses": [
-              {
-                "tag": "home",
-                "street": "123 Main St",
-                "city": "Anytown",
-                "state": "CA",
-                "postal_code": "12345",
-                "country": "USA"
-              }
-            ],
-            "birthday": "1980-01-01",
-            "notes": "Project manager",
-            "groups": ["friends", "work"]
-          },
-          {
-            "uid": "550e8400-e29b-41d4-a716-446655440001",
-            "full_name": "Jane Smith",
-            "vcs_uri": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/username/contacts/550e8400-e29b-41d4-a716-446655440001.vcf",
-            "emails": [
-              {
-                "tag": "personal",
-                "email": "jane.smith@example.com"
-              }
-            ],
-            "phones": [
-              {
-                "tag": "home",
-                "number": "+1-555-987-6543"
-              }
-            ],
-            "addresses": [],
-            "birthday": null,
-            "notes": "Software developer",
-            "groups": ["work", "tech"]
-          }
-        ]
+    **Data Freshness:**
+    Returns the most current data from the Nextcloud server, including any recent
+    changes made through other clients or interfaces.
     """
     user_info = authenticate_with_nextcloud(credentials)
     if IS_DEBUG:
@@ -541,94 +605,103 @@ async def get_all_contacts_endpoint(
 
 
 
-@router.post("/search", operation_id="search_contacts_by_params", response_model=List[Contact])
+@router.post(
+    "/search",
+    operation_id="search_contacts_by_params",
+    response_model=List[Contact],
+    summary="Search contacts",
+    description="Search for contacts using specified criteria",
+    responses={
+        200: {
+            "description": "Search completed successfully",
+            "model": List[Contact],
+        },
+        400: {
+            "description": "Invalid search criteria",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid search criteria provided"}
+                }
+            },
+        },
+        401: {
+            "description": "Authentication failed",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid credentials"}
+                }
+            },
+        },
+        403: {
+            "description": "Authorization refused",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Access denied to addressbook"}
+                }
+            },
+        },
+        404: {
+            "description": "Addressbook not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Addressbook not found"}
+                }
+            },
+        },
+        503: {
+            "description": "Server error or connection issue",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Could not search contacts: Connection failed"}
+                }
+            },
+        },
+    },
+    tags=["contacts"],
+)
 async def search_contacts_endpoint(
     search_criteria: ContactSearchCriteria,
     credentials: HTTPBasicCredentials = Depends(security)
 ) -> List[Contact]:
     """
-    Search for contacts in a Nextcloud CardDAV addressbook using specified criteria.
+    Search for contacts in the Nextcloud CardDAV addressbook using specified criteria.
     
-    This endpoint performs a CardDAV REPORT request with filters to search for contacts
-    matching the specified criteria. The search is performed server-side using CardDAV's
-    filtering capabilities, making it efficient even for large addressbooks.
+    Performs server-side filtering using CardDAV's advanced search capabilities.
+    This approach is efficient even for large addressbooks as filtering occurs
+    on the Nextcloud server rather than retrieving all contacts first.
     
-    The search criteria are provided as a JSON object in the request body, with fields
-    corresponding to the ContactSearchCriteria model. All search fields are optional,
-    and case-insensitive partial matching is used for string fields.
+    **Key Features:**
+    - Server-side filtering for optimal performance
+    - Flexible search criteria with multiple field support
+    - Case-insensitive partial matching
+    - Configurable search logic (AND/OR operations)
     
-    Supported search fields include:
-    - uid: Search by contact UID
-    - full_name: Search by contact's full name
-    - email: Search by any email address
-    - phone: Search by any phone number
-    - address: Search by any address field (street, city, state, etc.)
-    - birthday: Search by birthday
-    - group: Search by group/category
+    **Authentication:**
+    Requires HTTP Basic Authentication with valid Nextcloud credentials.
     
-    The search_type parameter controls the search logic:
-    - "anyof" (default): Returns contacts that match ANY of the specified criteria (OR logic)
-    - "allof": Returns contacts that match ALL of the specified criteria (AND logic)
+    **Search Fields:**
+    - **uid**: Contact unique identifier
+    - **full_name**: Contact's display name
+    - **email**: Any email address associated with the contact
+    - **phone**: Any phone number associated with the contact
+    - **address**: Any address field (street, city, state, postal code, country)
+    - **birthday**: Contact's birthday date
+    - **group**: Group or category assignment
     
-    Authentication:
-        HTTP Basic Authentication with Nextcloud credentials
+    **Search Logic:**
+    - **anyof** (default): OR logic - matches contacts with ANY specified criteria
+    - **allof**: AND logic - matches contacts with ALL specified criteria
     
-    Returns:
-        List[Contact]: A list of Contact objects that match the search criteria
+    **Search Behavior:**
+    - All text searches are case-insensitive
+    - Partial matching is used for string fields
+    - Empty criteria are ignored
+    - Returns empty list if no matches found
     
-    Raises:
-        HTTPException(401): If authentication fails
-        HTTPException(403): If authorization is refused
-        HTTPException(404): If the addressbook is not found
-        HTTPException(503): If there's a server error or connection issue
-    
-    Example Request:
-        POST /contacts/search
-        Headers:
-            Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=
-            Content-Type: application/json
-        Body:
-            {
-              "full_name": "John",
-              "email": "example.com",
-              "search_type": "anyof"
-            }
-        
-        This will find contacts with "John" in their name OR "example.com" in their email.
-        
-    Example Response:
-        [
-          {
-            "uid": "550e8400-e29b-41d4-a716-446655440000",
-            "full_name": "John Doe",
-            "vcs_uri": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/username/contacts/550e8400-e29b-41d4-a716-446655440000.vcf",
-            "emails": [
-              {
-                "tag": "work",
-                "email": "john.doe@example.com"
-              }
-            ],
-            "phones": [
-              {
-                "tag": "cell",
-                "number": "+1-555-123-4567"
-              }
-            ],
-            "addresses": [
-              {
-                "tag": "home",
-                "street": "123 Main St",
-                "city": "Anytown",
-                "state": "CA",
-                "postal_code": "12345",
-                "country": "USA"
-              }
-            ],
-            "birthday": "1980-01-01",
-            "notes": "Project manager",
-            "groups": ["friends", "work"]
-          }
-        ]
+    **Performance Notes:**
+    - More efficient than retrieving all contacts and filtering client-side
+    - Response time depends on search complexity and addressbook size
+    - Consider using specific criteria to narrow results
     """
     try:
         # Authenticate with Nextcloud

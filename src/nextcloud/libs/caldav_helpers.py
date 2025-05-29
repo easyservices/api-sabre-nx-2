@@ -37,42 +37,51 @@ def parse_ical_to_event(ical_data: str, event_url: str) -> Event:
         # Extract the event component
         for component in calendar.walk():
             if component.name == "VEVENT":
-                # Parse attendees
-                attendees = parse_attendees(component)
-                
-                # Parse reminders/alarms
-                reminders = parse_reminders(component)
-                
-                # Extract categories
-                categories = []
-                if component.get("CATEGORIES"):
-                    categories = [str(cat) for cat in component.get("CATEGORIES", [])]
-                
-                # Create the Event object
-                event = Event(
-                    uid=str(component.get("UID", "")),
-                    summary=str(component.get("SUMMARY", "")),
-                    description=str(component.get("DESCRIPTION", "")) if component.get("DESCRIPTION") else None,
-                    location=str(component.get("LOCATION", "")) if component.get("LOCATION") else None,
-                    url=event_url,
-                    status=str(component.get("STATUS", "")) if component.get("STATUS") else None,
-                    organizer=str(component.get("ORGANIZER", "")).replace("mailto:", "") if component.get("ORGANIZER") else None,
-                    categories=categories if categories else None,
-                    created=format_datetime(component.get("CREATED")),
-                    last_modified=format_datetime(component.get("LAST-MODIFIED")),
-                    start=format_datetime(component.get("DTSTART")),
-                    end=format_datetime(component.get("DTEND")),
-                    all_day=is_all_day_event(component),
-                    recurrence=str(component.get("RRULE", "")) if component.get("RRULE") else None,
-                    recurrence_id=format_datetime(component.get("RECURRENCE-ID")) if component.get("RECURRENCE-ID") else None,
-                    attendees=attendees if attendees else None,
-                    reminders=reminders if reminders else None
-                )
-                return event
+                try:
+                    # Parse attendees
+                    attendees = parse_attendees(component)
+                    
+                    # Parse reminders/alarms
+                    reminders = parse_reminders(component)
+                    
+                    # Extract categories
+                    categories = []
+                    if component.get("CATEGORIES"):
+                        cat_data = component.get("CATEGORIES", [])
+                        if isinstance(cat_data, list):
+                            categories = [str(cat) for cat in cat_data]
+                        else:
+                            categories = [str(cat_data)]
+                    
+                    # Create the Event object
+                    event = Event(
+                        uid=str(component.get("UID", "")),
+                        summary=str(component.get("SUMMARY", "")),
+                        description=str(component.get("DESCRIPTION", "")) if component.get("DESCRIPTION") else None,
+                        location=str(component.get("LOCATION", "")) if component.get("LOCATION") else None,
+                        url=event_url,
+                        status=str(component.get("STATUS", "")) if component.get("STATUS") else None,
+                        organizer=str(component.get("ORGANIZER", "")).replace("mailto:", "") if component.get("ORGANIZER") else None,
+                        categories=categories if categories else None,
+                        created=format_datetime(component.get("CREATED")),
+                        last_modified=format_datetime(component.get("LAST-MODIFIED")),
+                        start=format_datetime(component.get("DTSTART")),
+                        end=format_datetime(component.get("DTEND")),
+                        all_day=is_all_day_event(component),
+                        recurrence=str(component.get("RRULE", "")) if component.get("RRULE") else None,
+                        recurrence_id=format_datetime(component.get("RECURRENCE-ID")) if component.get("RECURRENCE-ID") else None,
+                        attendees=attendees if attendees else None,
+                        reminders=reminders if reminders else None
+                    )
+                    return event
+                except Exception as parse_error:
+                    raise ValueError(f"Error parsing VEVENT component: {str(parse_error)}")
         
         # If no VEVENT component was found
-        raise ValueError("No event found in the iCalendar data")
+        raise ValueError("No VEVENT component found in the iCalendar data")
         
+    except icalendar.parser.InvalidCalendar as e:
+        raise ValueError(f"Invalid iCalendar format: {str(e)}")
     except Exception as e:
         raise ValueError(f"Failed to parse iCalendar data: {str(e)}")
 
@@ -89,13 +98,24 @@ def format_datetime(dt_value) -> Optional[str]:
     if not dt_value:
         return None
     
-    # Handle different types of datetime values
-    if isinstance(dt_value.dt, datetime):
-        # Format as ISO 8601
-        return dt_value.dt.isoformat()
-    else:
-        # For date-only values
-        return str(dt_value.dt)
+    try:
+        # Handle different types of datetime values
+        if hasattr(dt_value, 'dt'):
+            if isinstance(dt_value.dt, datetime):
+                # Format as ISO 8601
+                return dt_value.dt.isoformat()
+            else:
+                # For date-only values
+                return str(dt_value.dt)
+        else:
+            # Handle case where dt_value is already a string or datetime
+            if isinstance(dt_value, datetime):
+                return dt_value.isoformat()
+            else:
+                return str(dt_value)
+    except Exception as e:
+        # If all else fails, try to convert to string
+        return str(dt_value) if dt_value else None
 
 def is_all_day_event(component) -> bool:
     """
@@ -108,9 +128,17 @@ def is_all_day_event(component) -> bool:
         bool: True if the event is an all-day event, False otherwise.
     """
     dtstart = component.get("DTSTART")
-    if dtstart and not isinstance(dtstart.dt, datetime):
-        # If DTSTART is a date (not a datetime), it's an all-day event
-        return True
+    if dtstart:
+        try:
+            if hasattr(dtstart, 'dt'):
+                # If DTSTART is a date (not a datetime), it's an all-day event
+                return not isinstance(dtstart.dt, datetime)
+            else:
+                # Handle case where dtstart doesn't have dt attribute
+                return False
+        except Exception:
+            # If we can't determine, assume it's not all-day
+            return False
     return False
 
 def parse_attendees(component) -> List[Attendee]:
@@ -124,13 +152,28 @@ def parse_attendees(component) -> List[Attendee]:
         List[Attendee]: A list of Attendee objects containing attendee information.
     """
     attendees = []
-    for attendee in component.get("ATTENDEE", []):
+    attendee_data = component.get("ATTENDEE", [])
+    
+    # Handle case where there's only one attendee (returns single item instead of list)
+    if not isinstance(attendee_data, list):
+        attendee_data = [attendee_data]
+    
+    for attendee in attendee_data:
         # Extract attendee properties
         email = str(attendee).replace("mailto:", "")
-        role = str(attendee.params.get("ROLE", "")) if "ROLE" in attendee.params else None
-        status = str(attendee.params.get("PARTSTAT", "")) if "PARTSTAT" in attendee.params else None
-        attendee_type = str(attendee.params.get("CUTYPE", "")) if "CUTYPE" in attendee.params else None
-        name = str(attendee.params.get("CN", "")) if "CN" in attendee.params else None
+        
+        # Check if attendee has params attribute (some iCalendar implementations return strings)
+        if hasattr(attendee, 'params'):
+            role = str(attendee.params.get("ROLE", "")) if "ROLE" in attendee.params else None
+            status = str(attendee.params.get("PARTSTAT", "")) if "PARTSTAT" in attendee.params else None
+            attendee_type = str(attendee.params.get("CUTYPE", "")) if "CUTYPE" in attendee.params else None
+            name = str(attendee.params.get("CN", "")) if "CN" in attendee.params else None
+        else:
+            # If no params attribute, set all optional fields to None
+            role = None
+            status = None
+            attendee_type = None
+            name = None
         
         # Create Attendee object
         attendee_obj = Attendee(

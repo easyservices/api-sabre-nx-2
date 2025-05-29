@@ -1,0 +1,26 @@
+# Configuration file for Nextcloud FastAPI and FastMCP applications
+# Copyright (c) 2025 harokku999@gmail.com
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+
+# FastAPI Application Configuration
+fastapi:
+  title: "Nextcloud FastAPI"
+  summary: "A comprehensive FastAPI application that serves as a backend for Nextcloud, providing RESTful APIs for contacts and events management with CardDAV/CalDAV integration."
+  description: |
+    This FastAPI application is designed to work with Nextcloud, providing RESTful APIs for managing contacts and events.
+    It includes the following features:
+    
+    ## Features
+    - Complete CardDAV integration for contacts management
+    - Complete CalDAV integration for calendar events management
+    - HTTP Basic Authentication with Nextcloud credentials
+    - Static file server for frontend assets
+    
+    ## Authentication
+    All API endpoints require HTTP Basic Authentication with your Nextcloud credentials.
+
+  version: "0.2.0"
+  host: "0.0.0.0"
+  port: 8630
+  reload: true
+  log_level: "debug"

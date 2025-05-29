@@ -1,0 +1,8 @@
+# Configuration file for Nextcloud FastAPI and FastMCP applications
+# Copyright (c) 2025 harokku999@gmail.com
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+
+# Nextcloud Configuration
+nextcloud:
+  base_url: "https://nextcloud.example.com:8083"
+  api_proxy_url: "http://localhost:8560"

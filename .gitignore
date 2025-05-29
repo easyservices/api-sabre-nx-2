@@ -25,6 +25,8 @@ env/
 .DS_Store
 
 # Project-specific
-src/common/config.py
-src/nextcloud/config.py
+src/common/config.yaml
+src/nextcloud/config.yaml
+src/api/config.yaml
+src/mcp/config.yaml
 fastapi_server.service

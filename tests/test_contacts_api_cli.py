@@ -40,7 +40,8 @@ def test_get_all_contacts(is_debug=False):
         if is_debug:
             print(f"Found {len(contacts)} contacts")
             print(json.dumps(contacts, indent=4, sort_keys=True))
-        return len(contacts)
+        #assert len(contacts) > 0
+        return len(contacts)  # Return the number of contacts found
     else:
         print(f"Error: {response.text}")
 
@@ -82,7 +83,8 @@ def test_search_contacts(is_debug=False):
         if is_debug:
             print(f"Found {len(contacts)} matching contacts")
             print(json.dumps(contacts, indent=4, sort_keys=True))
-        return len(contacts)
+        #assert len(contacts) > 0
+        return len(contacts)  # Return the number of contacts found
     else:
         print(f"Error: {response.text}")
 
@@ -146,6 +148,7 @@ def test_create_contact(is_debug=False):
             print(json.dumps(created_contact, indent=4, sort_keys=True))
         
         # Return the created contact for use in update test
+        #assert created_contact is not None
         return created_contact
     else:
         print(f"Error: {response.text}")

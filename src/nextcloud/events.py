@@ -28,9 +28,9 @@ from src.nextcloud.libs.caldav_helpers import (
 )
 
 # Constants
-IS_DEBUG = False
+IS_DEBUG = True
 
-async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str) -> Optional[Event]:
+async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None) -> Optional[Event]:
     """
     Retrieve a single event by its UID from the specified Nextcloud CalDAV calendar.
     
@@ -41,6 +41,7 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str) -> Optio
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         uid (str): The UID of the event to retrieve.
+        calendar_name (Optional[str]): The name of the calendar. Defaults to None (uses "personal").
         
     Returns:
         Optional[Event]: The Event object if found, None otherwise.
@@ -56,7 +57,7 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str) -> Optio
     if IS_DEBUG:
         print(f"get_event_by_uid: User info: {user_info}")
     
-    caldav_url = gen_nxtcloud_url_calendar(user_info['id'])
+    caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
     if IS_DEBUG:
         print(f"get_event_by_uid: caldav_url: {caldav_url}")
     
@@ -107,7 +108,8 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str) -> Optio
 async def get_events_by_time_range(
     credentials: HTTPBasicCredentials,
     start_datetime: str,
-    end_datetime: str
+    end_datetime: str,
+    calendar_name: Optional[str],
 ) -> List[Event]:
     """
     Retrieve events between a start and end date/time from the specified Nextcloud CalDAV calendar.
@@ -119,6 +121,7 @@ async def get_events_by_time_range(
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         start_datetime (str): Start datetime in ISO format (YYYY-MM-DDTHH:MM:SS).
         end_datetime (str): End datetime in ISO format (YYYY-MM-DDTHH:MM:SS).
+        calendar_name (Optional[str]): The name of the calendar. Defaults to None (uses "personal").
         
     Returns:
         List[Event]: A list of Event objects within the specified time range.
@@ -134,7 +137,7 @@ async def get_events_by_time_range(
     if IS_DEBUG:
         print(f"get_events_by_time_range: User info: {user_info}")
     
-    caldav_url = gen_nxtcloud_url_calendar(user_info['id'])
+    caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
     if IS_DEBUG:
         print(f"get_events_by_time_range: caldav_url: {caldav_url}")
     
@@ -195,7 +198,7 @@ async def get_events_by_time_range(
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def create_event(credentials: HTTPBasicCredentials, event: Event) -> Event:
+async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar_name: Optional[str] = None) -> Event:
     """
     Create a new event in the specified Nextcloud CalDAV calendar.
     
@@ -206,6 +209,7 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event) -> Event
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         event (Event): The Event object to create.
+        calendar_name (Optional[str]): The name of the calendar. Defaults to None (uses "personal").
         
     Returns:
         Event: The created Event object with updated information from the server.
@@ -221,7 +225,7 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event) -> Event
     if IS_DEBUG:
         print(f"create_event: User info: {user_info}")
     
-    caldav_url = gen_nxtcloud_url_calendar(user_info['id'])
+    caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
     if IS_DEBUG:
         print(f"create_event: caldav_url: {caldav_url}")
     
@@ -281,7 +285,7 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event) -> Event
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def update_event(credentials: HTTPBasicCredentials, event: Event) -> Event:
+async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar_name: Optional[str] = None) -> Event:
     """
     Update an existing event in the specified Nextcloud CalDAV calendar.
     
@@ -292,6 +296,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event) -> Event
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         event (Event): The Event object with updated information.
+        calendar_name (Optional[str]): The name of the calendar. Defaults to None (uses "personal").
         
     Returns:
         Event: The updated Event object with any additional information from the server.
@@ -307,7 +312,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event) -> Event
     if IS_DEBUG:
         print(f"update_event: User info: {user_info}")
     
-    caldav_url = gen_nxtcloud_url_calendar(user_info['id'])
+    caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
     if IS_DEBUG:
         print(f"update_event: caldav_url: {caldav_url}")
     
@@ -333,7 +338,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event) -> Event
         print(f"Updating event at URL: {event_url}")
     
     # Optional: Check if the event exists
-    existing_event = await get_event_by_uid(credentials, event.uid)
+    existing_event = await get_event_by_uid(credentials, event.uid, calendar_name)
     if not existing_event:
         raise ValueError(f"Event with UID {event.uid} not found")
     
@@ -378,7 +383,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event) -> Event
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def delete_event(credentials: HTTPBasicCredentials, uid: str) -> bool:
+async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None) -> bool:
     """
     Delete an event from the specified Nextcloud CalDAV calendar.
     
@@ -388,6 +393,7 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str) -> bool:
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         uid (str): The UID of the event to delete.
+        calendar_name (Optional[str]): The name of the calendar. Defaults to None (uses "personal").
         
     Returns:
         bool: True if the event was successfully deleted, False if the event was not found.
@@ -403,7 +409,7 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str) -> bool:
     if IS_DEBUG:
         print(f"delete_event: User info: {user_info}")
     
-    caldav_url = gen_nxtcloud_url_calendar(user_info['id'])
+    caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
     if IS_DEBUG:
         print(f"delete_event: caldav_url: {caldav_url}")
     
@@ -423,7 +429,7 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str) -> bool:
         print(f"Deleting event at URL: {event_url}")
     
     # Optional: Check if the event exists
-    existing_event = await get_event_by_uid(credentials, uid)
+    existing_event = await get_event_by_uid(credentials, uid, calendar_name)
     if not existing_event:
         if IS_DEBUG:
             print(f"Event with UID {uid} not found, nothing to delete")

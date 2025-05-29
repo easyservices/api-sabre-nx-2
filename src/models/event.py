@@ -14,42 +14,6 @@ The module includes:
 - Reminder: Reminder/alarm information for events
 - EventSearchCriteria: Model for specifying search parameters
 
-JSON Example of an Event:
-```json
-{
-  "uid": "550e8400-e29b-41d4-a716-446655440000",
-  "summary": "Team Meeting",
-  "description": "Weekly team sync-up",
-  "location": "Conference Room A",
-  "url": "https://nextcloud.example.com/remote.php/dav/calendars/username/personal/550e8400-e29b-41d4-a716-446655440000.ics",
-  "start": "2025-04-21T14:00:00",
-  "end": "2025-04-21T15:00:00",
-  "all_day": false,
-  "created": "2025-04-01T10:00:00",
-  "last_modified": "2025-04-01T10:00:00",
-  "status": "CONFIRMED",
-  "organizer": "organizer@example.com",
-  "categories": ["MEETING", "WORK"],
-  "attendees": [
-    {
-      "email": "john.doe@example.com",
-      "name": "John Doe",
-      "role": "REQ-PARTICIPANT",
-      "status": "ACCEPTED",
-      "type": "INDIVIDUAL"
-    }
-  ],
-  "reminders": [
-    {
-      "type": "DISPLAY",
-      "trigger": "-PT15M",
-      "description": "Reminder: Team Meeting"
-    }
-  ],
-  "recurrence": "FREQ=WEEKLY;BYDAY=MO",
-  "recurrence_id": null
-}
-```
 """
 
 from typing import List, Optional, Literal, Union
@@ -193,25 +157,6 @@ class EventSearchCriteria(BaseModel):
         attendee="John",
         search_type="allof"
     )
-    ```
-    
-    JSON Example:
-    ```json
-    {
-      "summary": "Meeting",
-      "location": "Conference",
-      "search_type": "anyof"
-    }
-    ```
-    
-    ```json
-    {
-      "summary": "Project",
-      "attendee": "John",
-      "search_type": "allof",
-      "start_min": "2025-04-01T00:00:00",
-      "start_max": "2025-04-30T23:59:59"
-    }
     ```
     """
     uid: Optional[str] = Field(None, description="Search by event UID (case-insensitive partial match)")

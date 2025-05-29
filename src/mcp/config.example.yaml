@@ -1,0 +1,16 @@
+# Configuration file for Nextcloud FastAPI and FastMCP applications
+# Copyright (c) 2025 harokku999@gmail.com
+# Licensed under the MIT License - https://opensource.org/licenses/MIT
+
+# FastMCP Application Configuration
+fastmcp:
+  title: "Nextcloud FastMCP"
+  summary: "A FastMCP server implementation for Nextcloud, providing real-time updates for contacts and events management."
+  description: |
+    FastMCP is a server implementation that allows Nextcloud to push real-time updates for contacts and events.
+    This configuration file sets up the FastMCP application with necessary details such as title, summary, and description.
+  version: "0.1.0"
+  host: "0.0.0.0"
+  port: 1265
+  reload: true
+  log_level: "debug"

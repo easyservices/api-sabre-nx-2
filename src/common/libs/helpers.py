@@ -14,16 +14,19 @@ class UserSettings:
         self.NEXTCLOUD_USERNAME = NEXTCLOUD_USERNAME
         self.NEXTCLOUD_PASSWORD = NEXTCLOUD_PASSWORD
 
-def gen_nxtcloud_url_addressbook(username: str) -> str:
+def gen_nxtcloud_url_addressbook(username: str, addressbook_name: str = None) -> str:
     """Generate the Nextcloud URL for the address book of a given user.
     
     Args:
         username (str): The username of the user.
+        addressbook_name (str, optional): The name of the addressbook. Defaults to None.
         
     Returns:
         str: The generated Nextcloud URL for the address book.
     """
-    return f"{NEXTCLOUD_BASE_URL}/remote.php/dav/addressbooks/users/{username}/contacts/"
+    if not addressbook_name:
+        addressbook_name = "contacts"
+    return f"{NEXTCLOUD_BASE_URL}/remote.php/dav/addressbooks/users/{username}/{addressbook_name}/"
 
 def gen_nxtcloud_url_calendar(username: str, calendar_name: str = None) -> str:
     """Generate the Nextcloud URL for the calendar of a given user.
