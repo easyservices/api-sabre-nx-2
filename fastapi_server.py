@@ -71,7 +71,7 @@ app = FastAPI(
 app.add_middleware(CustomProxyHeadersMiddleware)
 
 # (Optionnel) Ajoute TrustedHostMiddleware si tu veux restreindre les hôtes autorisés
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["api.bienpratique.fr", "*.bienpratique.fr"])
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=fastapi_config['fastapi']['allowed_hosts'])
 
 
 # Add utility endpoints for health checks and other utility functions

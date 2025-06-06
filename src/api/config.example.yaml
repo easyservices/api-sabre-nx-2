@@ -24,3 +24,6 @@ fastapi:
   port: 8630
   reload: true
   log_level: "debug"
+  allowed_hosts:
+    - "api.myhost.com"
+    - "*.myhost.com"

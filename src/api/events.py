@@ -79,6 +79,17 @@ async def read_event_endpoint(
         min_length=1,
         max_length=255,
     ),
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
+    calendar_name: Optional[str] = Query(
+        None,
+        description="Optional calendar name to filter events from a specific calendar",
+        example="personal",
+        max_length=100
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
@@ -93,6 +104,8 @@ async def read_event_endpoint(
     - Complete event information including all fields
     - CalDAV protocol compliance
     - Efficient single-event lookup
+    - Optional privacy mode for sensitive data masking
+    - Optional calendar-specific filtering
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
@@ -103,6 +116,16 @@ async def read_event_endpoint(
     - Case-sensitive matching
     - Maximum length of 255 characters
     
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
+    
+    **Calendar Filtering:**
+    - **calendar_name**: Optional parameter to filter events from a specific calendar
+    - If not provided, searches in the default "personal" calendar
+    - Case-sensitive calendar name matching
+    
     **Returned Data:**
     Complete event information including:
     - **Basic Details**: Summary, description, location, status
@@ -112,6 +135,9 @@ async def read_event_endpoint(
     - **Notifications**: Reminders and alarms
     - **Recurrence**: Recurring event patterns and exceptions
     - **Metadata**: Creation/modification timestamps, server URL
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     try:
         if IS_DEBUG:
@@ -125,7 +151,8 @@ async def read_event_endpoint(
         # Call the get_event_by_uid function to retrieve the event from the server
         event = await get_event_by_uid(
             credentials=credentials,
-            uid=uid
+            uid=uid,
+            calendar_name=calendar_name
         )
         
         # If event is not found, raise a 404 error
@@ -211,6 +238,11 @@ async def read_events_by_time_range_endpoint(
         example="2025-04-28T23:59:59",
         regex=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$"
     ),
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
     calendar_name: Optional[str] = Query(
         None,
         description="Optional calendar name to filter events from a specific calendar",
@@ -232,6 +264,7 @@ async def read_events_by_time_range_endpoint(
     - Chronological sorting by start time
     - CalDAV protocol compliance
     - Efficient bulk event retrieval
+    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
@@ -241,6 +274,11 @@ async def read_events_by_time_range_endpoint(
     - **end_datetime**: End of the time range (inclusive)
     - Both must be in ISO format: YYYY-MM-DDTHH:MM:SS
     - End datetime must be after start datetime
+    
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
     
     **Calendar Filtering:**
     - **calendar_name**: Optional parameter to filter events from a specific calendar
@@ -261,6 +299,9 @@ async def read_events_by_time_range_endpoint(
     - Event scheduling and conflict detection
     - Reporting and analytics on time-based event data
     - Integration with external calendar applications
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     try:
         if IS_DEBUG:
@@ -355,6 +396,17 @@ async def read_events_by_time_range_endpoint(
 )
 async def create_event_endpoint(
     event: Event,
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
+    calendar_name: Optional[str] = Query(
+        None,
+        description="Optional calendar name to create the event in a specific calendar",
+        example="personal",
+        max_length=100
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
@@ -369,9 +421,21 @@ async def create_event_endpoint(
     - CalDAV protocol compliance
     - Comprehensive event information storage
     - Attendee management and invitation support
+    - Optional calendar-specific creation
+    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
+    
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
+    
+    **Calendar Selection:**
+    - **calendar_name**: Optional parameter to create the event in a specific calendar
+    - If not provided, creates the event in the default "personal" calendar
+    - Case-sensitive calendar name matching
     
     **Event Information Supported:**
     - **Basic Details**: Summary (required), description, location, status
@@ -398,6 +462,9 @@ async def create_event_endpoint(
     - Event is immediately available in all synchronized calendar clients
     - Server-generated fields (created, last_modified, url) are populated automatically
     - Organizer field is set based on the authenticated user
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     try:
         if IS_DEBUG:
@@ -411,7 +478,8 @@ async def create_event_endpoint(
         # Call the create_event function to create the event on the server
         created_event = await create_event(
             credentials=credentials,
-            event=event
+            event=event,
+            calendar_name=calendar_name
         )
         
         if IS_DEBUG:
@@ -498,6 +566,17 @@ async def create_event_endpoint(
 async def update_event_endpoint(
     event: Event,
     uid: str = Path(..., description="Unique identifier for the event", example="550e8400-e29b-41d4-a716-446655440000"),
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
+    calendar_name: Optional[str] = Query(
+        None,
+        description="Optional calendar name to update the event in a specific calendar",
+        example="personal",
+        max_length=100
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
@@ -513,6 +592,8 @@ async def update_event_endpoint(
     - CalDAV protocol compliance
     - Atomic update operations
     - Preserves event history and metadata
+    - Optional calendar-specific updates
+    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
@@ -521,6 +602,16 @@ async def update_event_endpoint(
     - **Event Data**: Provided in the request body as a JSON object
     - **UID Parameter**: Specified in the URL path
     - **UID Consistency**: The UID in the path must match the UID in the event data
+    
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
+    
+    **Calendar Selection:**
+    - **calendar_name**: Optional parameter to update the event in a specific calendar
+    - If not provided, updates the event in the default "personal" calendar
+    - Case-sensitive calendar name matching
     
     **Update Behavior:**
     - All event fields can be updated except the UID
@@ -531,6 +622,9 @@ async def update_event_endpoint(
     **UID Handling:**
     If the event data doesn't include a UID, it will be automatically set from the path parameter.
     If both are provided, they must match exactly.
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     try:
         if IS_DEBUG:
@@ -552,7 +646,8 @@ async def update_event_endpoint(
         # Call the update_event function to update the event on the server
         updated_event = await update_event(
             credentials=credentials,
-            event=event
+            event=event,
+            calendar_name=calendar_name
         )
         
         if IS_DEBUG:
@@ -624,6 +719,17 @@ async def update_event_endpoint(
 )
 async def delete_event_endpoint(
     uid: str = Path(..., description="Unique identifier for the event", example="550e8400-e29b-41d4-a716-446655440000"),
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
+    calendar_name: Optional[str] = Query(
+        None,
+        description="Optional calendar name to delete the event from a specific calendar",
+        example="personal",
+        max_length=100
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
@@ -638,6 +744,8 @@ async def delete_event_endpoint(
     - Atomic delete operations
     - Immediate synchronization across clients
     - Cascade deletion of related data
+    - Optional calendar-specific deletion
+    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
@@ -648,11 +756,24 @@ async def delete_event_endpoint(
     - Case-sensitive matching
     - Maximum length of 255 characters
     
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
+    
+    **Calendar Selection:**
+    - **calendar_name**: Optional parameter to delete the event from a specific calendar
+    - If not provided, deletes the event from the default "personal" calendar
+    - Case-sensitive calendar name matching
+    
     **Deletion Behavior:**
     - Event is permanently removed from the calendar
     - All associated data (attendees, reminders, etc.) is also deleted
     - Changes are immediately synchronized to all connected calendar clients
     - Deletion cannot be undone through the API
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     try:
         if IS_DEBUG:
@@ -666,7 +787,8 @@ async def delete_event_endpoint(
         # Call the delete_event function to delete the event from the server
         result = await delete_event(
             credentials=credentials,
-            uid=uid
+            uid=uid,
+            calendar_name=calendar_name
         )
         
         # If the event was not found, return a 404 error
