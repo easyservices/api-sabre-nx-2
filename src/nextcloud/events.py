@@ -30,7 +30,7 @@ from src.nextcloud.libs.caldav_helpers import (
 # Constants
 IS_DEBUG = True
 
-async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None) -> Optional[Event]:
+async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Event]:
     """
     Retrieve a single event by its UID from the specified Nextcloud CalDAV calendar.
     
@@ -99,7 +99,7 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar
                     handle_caldav_response_status(status_code, response_text)
                 
                 # Parse iCalendar data to dictionary
-                return parse_ical_to_event(response_text, event_url)
+                return parse_ical_to_event(response_text, event_url, privacy)
                 
         except aiohttp.ClientError as e:
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
@@ -110,6 +110,7 @@ async def get_events_by_time_range(
     start_datetime: str,
     end_datetime: str,
     calendar_name: Optional[str],
+    privacy: Optional[bool] = False
 ) -> List[Event]:
     """
     Retrieve events between a start and end date/time from the specified Nextcloud CalDAV calendar.
@@ -180,7 +181,7 @@ async def get_events_by_time_range(
                     
                     if calendar_data:
                         try:
-                            event = parse_ical_to_event(calendar_data, href)
+                            event = parse_ical_to_event(calendar_data, href, privacy)
                             events.append(event)
                         except ValueError as e:
                             if IS_DEBUG:

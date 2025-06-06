@@ -16,7 +16,7 @@ from datetime import datetime
 
 from src.models.event import Event, Attendee, Reminder
 
-def parse_ical_to_event(ical_data: str, event_url: str) -> Event:
+def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] = False) -> Event:
     """
     Parse iCalendar data into an Event object.
     
@@ -52,12 +52,17 @@ def parse_ical_to_event(ical_data: str, event_url: str) -> Event:
                             categories = [str(cat) for cat in cat_data]
                         else:
                             categories = [str(cat_data)]
+
+                    # Handle privacy setting
+                    description = str(component.get("DESCRIPTION", "")) if component.get("DESCRIPTION") else None
+                    if privacy is True:
+                        description = None
                     
                     # Create the Event object
                     event = Event(
                         uid=str(component.get("UID", "")),
                         summary=str(component.get("SUMMARY", "")),
-                        description=str(component.get("DESCRIPTION", "")) if component.get("DESCRIPTION") else None,
+                        description=description,
                         location=str(component.get("LOCATION", "")) if component.get("LOCATION") else None,
                         url=event_url,
                         status=str(component.get("STATUS", "")) if component.get("STATUS") else None,

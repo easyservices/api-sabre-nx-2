@@ -152,7 +152,8 @@ async def read_event_endpoint(
         event = await get_event_by_uid(
             credentials=credentials,
             uid=uid,
-            calendar_name=calendar_name
+            calendar_name=calendar_name,
+            privacy = privacy,
         )
         
         # If event is not found, raise a 404 error
@@ -317,7 +318,8 @@ async def read_events_by_time_range_endpoint(
             calendar_name=calendar_name,
             credentials=credentials,
             start_datetime=start_datetime,
-            end_datetime=end_datetime
+            end_datetime=end_datetime,
+            privacy=privacy
         )
         
         if IS_DEBUG:
@@ -396,11 +398,6 @@ async def read_events_by_time_range_endpoint(
 )
 async def create_event_endpoint(
     event: Event,
-    privacy: bool = Query(
-        False,
-        description="Enable privacy mode to mask sensitive values in the response",
-        example=False
-    ),
     calendar_name: Optional[str] = Query(
         None,
         description="Optional calendar name to create the event in a specific calendar",
@@ -422,15 +419,9 @@ async def create_event_endpoint(
     - Comprehensive event information storage
     - Attendee management and invitation support
     - Optional calendar-specific creation
-    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
-    
-    **Privacy Parameter:**
-    - **privacy**: Optional boolean parameter (default: False)
-    - When set to True, masks or hides sensitive values in the response
-    - Useful for protecting confidential information in logs or public displays
     
     **Calendar Selection:**
     - **calendar_name**: Optional parameter to create the event in a specific calendar
@@ -566,11 +557,6 @@ async def create_event_endpoint(
 async def update_event_endpoint(
     event: Event,
     uid: str = Path(..., description="Unique identifier for the event", example="550e8400-e29b-41d4-a716-446655440000"),
-    privacy: bool = Query(
-        False,
-        description="Enable privacy mode to mask sensitive values in the response",
-        example=False
-    ),
     calendar_name: Optional[str] = Query(
         None,
         description="Optional calendar name to update the event in a specific calendar",
@@ -602,11 +588,6 @@ async def update_event_endpoint(
     - **Event Data**: Provided in the request body as a JSON object
     - **UID Parameter**: Specified in the URL path
     - **UID Consistency**: The UID in the path must match the UID in the event data
-    
-    **Privacy Parameter:**
-    - **privacy**: Optional boolean parameter (default: False)
-    - When set to True, masks or hides sensitive values in the response
-    - Useful for protecting confidential information in logs or public displays
     
     **Calendar Selection:**
     - **calendar_name**: Optional parameter to update the event in a specific calendar
@@ -719,11 +700,6 @@ async def update_event_endpoint(
 )
 async def delete_event_endpoint(
     uid: str = Path(..., description="Unique identifier for the event", example="550e8400-e29b-41d4-a716-446655440000"),
-    privacy: bool = Query(
-        False,
-        description="Enable privacy mode to mask sensitive values in the response",
-        example=False
-    ),
     calendar_name: Optional[str] = Query(
         None,
         description="Optional calendar name to delete the event from a specific calendar",
@@ -755,11 +731,6 @@ async def delete_event_endpoint(
     - Must be a valid, existing event UID
     - Case-sensitive matching
     - Maximum length of 255 characters
-    
-    **Privacy Parameter:**
-    - **privacy**: Optional boolean parameter (default: False)
-    - When set to True, masks or hides sensitive values in the response
-    - Useful for protecting confidential information in logs or public displays
     
     **Calendar Selection:**
     - **calendar_name**: Optional parameter to delete the event from a specific calendar
