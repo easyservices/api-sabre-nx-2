@@ -48,6 +48,8 @@ from src.api import contacts, events, utils
 from src.api import load_config as load_fastapi_config
 import uvicorn
 from starlette.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from src.common.add_proxy import CustomProxyHeadersMiddleware
 from src.common.sec import authenticate_with_nextcloud
 from src.common import security
 
@@ -64,6 +66,12 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+
+# Ajoute d'abord ProxyHeadersMiddleware pour gérer X-Forwarded-*
+app.add_middleware(CustomProxyHeadersMiddleware)
+
+# (Optionnel) Ajoute TrustedHostMiddleware si tu veux restreindre les hôtes autorisés
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["api.bienpratique.fr", "*.bienpratique.fr"])
 
 
 # Add utility endpoints for health checks and other utility functions

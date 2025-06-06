@@ -30,3 +30,4 @@ src/nextcloud/config.yaml
 src/api/config.yaml
 src/mcp/config.yaml
 fastapi_server.service
+fastmcp_server.service
