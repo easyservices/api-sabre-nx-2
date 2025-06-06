@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 from src.models.event import Event, Attendee, Reminder
+from src.nextcloud.libs import PRIVACY_MODE_TXT
 
 def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] = False) -> Event:
     """
@@ -56,7 +57,7 @@ def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] 
                     # Handle privacy setting
                     description = str(component.get("DESCRIPTION", "")) if component.get("DESCRIPTION") else None
                     if privacy is True:
-                        description = None
+                        description = PRIVACY_MODE_TXT
                     
                     # Create the Event object
                     event = Event(

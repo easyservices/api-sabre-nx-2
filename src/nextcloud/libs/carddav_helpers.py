@@ -21,6 +21,7 @@ from src.nextcloud import (
     API_ERR_SERVER_ERROR,
     API_ERR_SERVER_UNATTENDED_RESPONSE
 )
+from src.nextcloud.libs import PRIVACY_MODE_TXT
 
 
 def create_request_headers(auth_header: str) -> Dict[str, str]:
@@ -105,7 +106,7 @@ def parse_xml_response(response_text: str) -> List[Dict[str, Any]]:
     return result
 
 
-def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optional[Contact]:
+def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Contact]:
     """
     Parse a vCard string into a Contact object.
     
@@ -174,11 +175,21 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optio
                     try:
                         # Safely extract type_param
                         tag = str(adr.type_param) if hasattr(adr, 'type_param') and adr.type_param is not None else ""
+
+                        # If privacy is enabled
+                        street=str(adr.value.street) if hasattr(adr.value, 'street') else None
+                        city=str(adr.value.city) if hasattr(adr.value, 'city') else None
+                        postal_code=str(adr.value.code) if hasattr(adr.value, 'code') else None
+                        if privacy is True:
+                            city = PRIVACY_MODE_TXT
+                            street = PRIVACY_MODE_TXT
+                            postal_code = None
+
                         addresses.append(Address(
-                            street=str(adr.value.street) if hasattr(adr.value, 'street') else None,
-                            city=str(adr.value.city) if hasattr(adr.value, 'city') else None,
+                            street=street,
+                            city=city,
                             state=str(adr.value.region) if hasattr(adr.value, 'region') else None,
-                            postal_code=str(adr.value.code) if hasattr(adr.value, 'code') else None,
+                            postal_code=postal_code,
                             country=str(adr.value.country) if hasattr(adr.value, 'country') else None,
                             tag=tag
                         ))
@@ -186,11 +197,21 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optio
                         print(f"Error parsing address for contact UID {uid}: {address_error}")
                         print(f"Address object: {adr}")
                         # Add address without tag as fallback
+                        
+                        # If privacy is enabled
+                        street=str(adr.value.street) if hasattr(adr.value, 'street') else None
+                        city=str(adr.value.city) if hasattr(adr.value, 'city') else None
+                        postal_code=str(adr.value.code) if hasattr(adr.value, 'code') else None
+                        if privacy is True:
+                            city = PRIVACY_MODE_TXT
+                            street = PRIVACY_MODE_TXT
+                            postal_code = None
+
                         addresses.append(Address(
-                            street=str(adr.value.street) if hasattr(adr.value, 'street') else None,
-                            city=str(adr.value.city) if hasattr(adr.value, 'city') else None,
+                            street=street,
+                            city=city,
                             state=str(adr.value.region) if hasattr(adr.value, 'region') else None,
-                            postal_code=str(adr.value.code) if hasattr(adr.value, 'code') else None,
+                            postal_code=postal_code,
                             country=str(adr.value.country) if hasattr(adr.value, 'country') else None,
                             tag=""
                         ))
@@ -201,6 +222,11 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optio
             try:
                 # Get the raw birthday value
                 bday_value = str(vcard.bday.value)
+
+                if privacy is True:
+                    # If privacy is enabled, return None for birthday
+                    birthday = None
+                    return
                 
                 # Handle different vCard birthday formats
                 # Format 1: YYYYMMDD
@@ -225,7 +251,11 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None) -> Optio
         # Extract notes
         notes = None
         if hasattr(vcard, 'note'):
-            notes = str(vcard.note.value)
+            # If privacy is enabled, return None for notes
+            if privacy is False:
+                notes = str(vcard.note.value)
+            else:
+                notes = PRIVACY_MODE_TXT
         
         # Extract contact groups/categories
         groups = []

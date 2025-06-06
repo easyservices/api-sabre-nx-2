@@ -1,8 +1,8 @@
 # Copyright (c) 2025 harokku999@gmail.com
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 
-from fastapi import APIRouter, HTTPException, Depends, Path
-from typing import List
+from fastapi import APIRouter, HTTPException, Depends, Path, Query
+from typing import List, Optional
 
 from fastapi.security import HTTPBasicCredentials
 from src.common import security
@@ -191,6 +191,11 @@ async def read_contact_endpoint(
         min_length=1,
         max_length=255,
     ),
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ):
     """
@@ -205,6 +210,7 @@ async def read_contact_endpoint(
     - Full contact information including all fields
     - CardDAV protocol compliance
     - Efficient single-contact lookup
+    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
@@ -215,9 +221,17 @@ async def read_contact_endpoint(
     - Case-sensitive matching
     - Maximum length of 255 characters
     
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
+    
     **Returned Data:**
     Complete contact information including personal details, communication methods,
     addresses, and organizational data as stored in the CardDAV server.
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     try:
         if IS_DEBUG:
@@ -231,7 +245,8 @@ async def read_contact_endpoint(
         # Call the get_contact_by_uid function to retrieve the contact from the server
         contact = await get_contact_by_uid(
             credentials=credentials,
-            uid=uid
+            uid=uid,
+            privacy=privacy
         )
         
         # If contact is not found, raise a 404 error
@@ -552,6 +567,11 @@ async def delete_contact_endpoint(
     tags=["contacts"],
 )
 async def get_all_contacts_endpoint(
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ) -> List[Contact]:
     """
@@ -565,9 +585,15 @@ async def get_all_contacts_endpoint(
     - Complete contact information for all contacts
     - CardDAV protocol compliance
     - Efficient bulk contact fetching
+    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
+    
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
     
     **Returned Data Structure:**
     Each contact includes comprehensive information:
@@ -586,6 +612,9 @@ async def get_all_contacts_endpoint(
     **Data Freshness:**
     Returns the most current data from the Nextcloud server, including any recent
     changes made through other clients or interfaces.
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     user_info = authenticate_with_nextcloud(credentials)
     if IS_DEBUG:
@@ -593,7 +622,8 @@ async def get_all_contacts_endpoint(
     
     try:
         contacts = await get_all_contacts(
-            credentials=credentials
+            credentials=credentials,
+            privacy=privacy
         )
     except Exception as e:
         # Handle potential errors during the fetch from Nextcloud
@@ -661,6 +691,11 @@ async def get_all_contacts_endpoint(
 )
 async def search_contacts_endpoint(
     search_criteria: ContactSearchCriteria,
+    privacy: bool = Query(
+        False,
+        description="Enable privacy mode to mask sensitive values in the response",
+        example=False
+    ),
     credentials: HTTPBasicCredentials = Depends(security)
 ) -> List[Contact]:
     """
@@ -675,9 +710,15 @@ async def search_contacts_endpoint(
     - Flexible search criteria with multiple field support
     - Case-insensitive partial matching
     - Configurable search logic (AND/OR operations)
+    - Optional privacy mode for sensitive data masking
     
     **Authentication:**
     Requires HTTP Basic Authentication with valid Nextcloud credentials.
+    
+    **Privacy Parameter:**
+    - **privacy**: Optional boolean parameter (default: False)
+    - When set to True, masks or hides sensitive values in the response
+    - Useful for protecting confidential information in logs or public displays
     
     **Search Fields:**
     - **uid**: Contact unique identifier
@@ -702,6 +743,9 @@ async def search_contacts_endpoint(
     - More efficient than retrieving all contacts and filtering client-side
     - Response time depends on search complexity and addressbook size
     - Consider using specific criteria to narrow results
+    
+    **Note:** When privacy mode is enabled, certain sensitive fields may be masked
+    or omitted from the response to protect confidential information.
     """
     try:
         # Authenticate with Nextcloud
@@ -711,7 +755,8 @@ async def search_contacts_endpoint(
         
         contacts = await search_contacts(
             credentials=credentials,
-            search_criteria=search_criteria
+            search_criteria=search_criteria,
+            privacy=privacy
         )
     except Exception as e:
         if IS_DEBUG:

@@ -78,7 +78,7 @@ from src.nextcloud.libs.carddav_helpers import (
 IS_DEBUG = False  # Set to True for debugging - be aware of sensitive data in logs
 
 
-async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: Optional[str] = None) -> List[Contact]:
+async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: Optional[str] = None, privacy: Optional[bool] = False) -> List[Contact]:
     """
     Retrieve all contacts from the specified Nextcloud CardDAV addressbook.
     
@@ -100,6 +100,7 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
+        privacy (Optional[bool]): Enable privacy mode to mask sensitive values. Defaults to False.
 
     Returns:
         List[Contact]: List of Contact objects parsed from vCard data.
@@ -141,7 +142,7 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
                 contacts = []
                 for i, item in enumerate(parsed_data):
                     try:
-                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'])
+                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'], privacy)
                         if contact:
                             contacts.append(contact)
                         else:
@@ -162,7 +163,8 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
 async def search_contacts(
     credentials: HTTPBasicCredentials,
     search_criteria: ContactSearchCriteria,
-    addressbook_name: Optional[str] = None
+    addressbook_name: Optional[str] = None,
+    privacy: Optional[bool] = False
 ) -> List[Contact]:
     """
     Search for contacts from the specified Nextcloud CardDAV addressbook based on search criteria.
@@ -176,6 +178,7 @@ async def search_contacts(
         search_criteria (ContactSearchCriteria): Pydantic model containing search criteria.
             All fields are optional and case-insensitive partial matches are used for string fields.
         addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
+        privacy (Optional[bool]): Enable privacy mode to mask sensitive values. Defaults to False.
     
     Returns:
         List[Contact]: List of Contact objects that match the search criteria.
@@ -224,7 +227,7 @@ async def search_contacts(
                 contacts = []
                 for i, item in enumerate(parsed_data):
                     try:
-                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'])
+                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'], privacy)
                         if contact:
                             contacts.append(contact)
                         else:
@@ -491,7 +494,7 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressboo
             raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
 
 
-async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addressbook_name: Optional[str] = None) -> Optional[Contact]:
+async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addressbook_name: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Contact]:
     """
     Retrieve a single contact by its UID from the specified Nextcloud CardDAV addressbook.
     
@@ -503,6 +506,7 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addres
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
         uid (str): The UID of the contact to retrieve.
         addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
+        privacy (Optional[bool]): Enable privacy mode to mask sensitive values. Defaults to False.
         
     Returns:
         Optional[Contact]: The Contact object if found, None otherwise.
@@ -557,7 +561,7 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addres
                     handle_response_status(status_code, response_text)
                 
                 # Parse vCard data to Contact object
-                contact = parse_vcard_to_contact(response_text, contact_url)
+                contact = parse_vcard_to_contact(response_text, contact_url, privacy)
                 return contact
                 
         except aiohttp.ClientError as e:
