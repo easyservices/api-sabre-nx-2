@@ -24,8 +24,10 @@ from src.nextcloud.libs.caldav_helpers import (
     create_calendar_query_xml,
     parse_caldav_xml_response,
     event_to_ical,
-    create_caldav_event_headers
+    create_caldav_event_headers,
+    parse_events_from_response
 )
+from src.nextcloud.libs.carddav_helpers import validate_and_correct_url
 from src import logger
 
 async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Event]:
@@ -163,18 +165,8 @@ async def get_events_by_time_range(
                 # Parse the XML response
                 calendar_items = parse_caldav_xml_response(response_text)
                 
-                # Convert each calendar item to an Event object
-                events = []
-                for item in calendar_items:
-                    href = item.get('href')
-                    calendar_data = item.get('calendar_data')
-                    
-                    if calendar_data:
-                        try:
-                            event = parse_ical_to_event(calendar_data, href, privacy)
-                            events.append(event)
-                        except ValueError as e:
-                            logger.error(f"Error parsing event: {e}")
+                # Convert each calendar item to an Event object using the new helper function
+                events = parse_events_from_response(calendar_items, privacy)
                 
                 # Sort events by start datetime
                 events.sort(key=lambda event: event.start if event.start else "")
@@ -257,8 +249,8 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
                 if status_code not in (201, 204):  # 201 Created or 204 No Content are success codes
                     handle_caldav_response_status(status_code, response_text)
                 
-                # Update the event URL
-                event.url = event_url
+                # Update the event URL with validation
+                event.url = validate_and_correct_url(event_url)
                 
                 logger.debug(f"Event created successfully with UID: {event.uid}")
                 
@@ -323,7 +315,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     
     # Preserve certain fields from the existing event if not provided in the update
     if not event.url:
-        event.url = existing_event.url
+        event.url = validate_and_correct_url(existing_event.url) if existing_event.url else None
     
     if not event.created:
         event.created = existing_event.created
@@ -349,8 +341,8 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
                 if status_code not in (200, 204):  # 200 OK or 204 No Content are success codes for updates
                     handle_caldav_response_status(status_code, response_text)
                 
-                # Update the event URL (in case it changed)
-                event.url = event_url
+                # Update the event URL (in case it changed) with validation
+                event.url = validate_and_correct_url(event_url)
                 
                 logger.debug(f"Event updated successfully with UID: {event.uid}")
                 

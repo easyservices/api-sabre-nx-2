@@ -361,12 +361,12 @@ async def update_contact_endpoint(
     
     **Update Behavior:**
     - Replaces the entire contact record
-    - Preserves the original UID and vcs_uri
+    - Preserves the original UID and url
     - Updates all provided fields
     - Maintains CardDAV server timestamps
     
     **URL Resolution:**
-    If the contact has a vcs_uri, it will be used for the update. Otherwise,
+    If the contact has a url, it will be used for the update. Otherwise,
     the URL is constructed from the addressbook path and contact UID.
     """
     try:
@@ -606,7 +606,7 @@ async def get_all_contacts_endpoint(
     - **Communication**: Multiple email addresses and phone numbers with type tags
     - **Location**: Multiple physical addresses with complete details
     - **Organization**: Group/category assignments
-    - **Metadata**: vCard URI for direct server access
+    - **Metadata**: vCard URL for direct server access
     
     **Performance Considerations:**
     - Fetches all contacts in a single request

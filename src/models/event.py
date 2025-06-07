@@ -80,7 +80,7 @@ class Event(BaseModel):
     summary: str = Field(..., description="Title or summary of the event")
     description: Optional[str] = Field(None, description="Detailed description of the event")
     location: Optional[str] = Field(None, description="Location where the event takes place")
-    url: Optional[str] = Field(None, description="URI of the event on the CalDAV server")
+    url: Optional[str] = Field(None, description="URL of the event on the CalDAV server")
     
     # Timing information
     start: str = Field(..., description="Start time of the event in ISO format (YYYY-MM-DDTHH:MM:SS)")

@@ -72,7 +72,9 @@ from src.nextcloud.libs.carddav_helpers import (
     parse_xml_response,
     parse_vcard_to_contact,
     contact_to_vcard,
-    create_vcard_headers
+    create_vcard_headers,
+    validate_and_correct_url,
+    parse_contacts_from_response
 )
 from src import logger
 
@@ -94,7 +96,7 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
     - Birthday (formatted as YYYY-MM-DD)
     - Notes
     - Groups/categories
-    - vCard URI
+    - vCard URL
 
     Args:
         credentials (HTTPBasicCredentials): HTTP Basic Authentication credentials.
@@ -133,21 +135,8 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
                 # Parse XML response
                 parsed_data = parse_xml_response(response_text)
                 
-                # Parse vCards to Contact objects
-                contacts = []
-                for i, item in enumerate(parsed_data):
-                    try:
-                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'], privacy)
-                        if contact:
-                            contacts.append(contact)
-                        else:
-                            logger.error(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
-                    except Exception as e:
-                        logger.error(f"Error parsing contact #{i+1}: {e}")
-                        logger.error(f"Contact href: {item.get('href', 'Unknown')}")
-                        logger.error(f"vCard data (first 200 chars): {item.get('vcard_data', '')[:200]}")
-                        # Continue processing other contacts instead of failing completely
-                        continue
+                # Parse vCards to Contact objects using the shared helper function
+                contacts = parse_contacts_from_response(parsed_data, privacy)
                 
                 return contacts
                 
@@ -215,21 +204,8 @@ async def search_contacts(
                 # Parse XML response
                 parsed_data = parse_xml_response(response_text)
                 
-                # Parse vCards to Contact objects
-                contacts = []
-                for i, item in enumerate(parsed_data):
-                    try:
-                        contact = parse_vcard_to_contact(item['vcard_data'], item['href'], privacy)
-                        if contact:
-                            contacts.append(contact)
-                        else:
-                            logger.error(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
-                    except Exception as e:
-                        logger.error(f"Error parsing contact #{i+1}: {e}")
-                        logger.error(f"Contact href: {item.get('href', 'Unknown')}")
-                        logger.error(f"vCard data (first 200 chars): {item.get('vCard_data', '')[:200]}")
-                        # Continue processing other contacts instead of failing completely
-                        continue
+                # Parse vCards to Contact objects using the shared helper function
+                contacts = parse_contacts_from_response(parsed_data, privacy)
                 
                 return contacts
                 
@@ -253,7 +229,7 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
         addressbook_name (Optional[str]): The name of the addressbook. Defaults to None (uses "contacts").
         
     Returns:
-        Contact: The created Contact object with updated information (like UID and vcs_uri).
+        Contact: The created Contact object with updated information (like UID and url).
         
     Raises:
         HTTPException: For authentication, authorization, server, or parsing errors.
@@ -283,12 +259,12 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     # Join the URL properly
     contact_url = f"{base_url}{contact_filename}"
     
-    # Update the contact's vcs_uri with the URL where it will be created
-    contact.vcs_uri = contact_url
+    # Update the contact's url with the URL where it will be created (with validation)
+    contact.url = validate_and_correct_url(contact_url)
 
     logger.debug(f"Creating contact at URL: {contact_url}")
     
-    # Generate the vCard data with the updated vcs_uri
+    # Generate the vCard data with the updated url
     vcard_data = contact_to_vcard(contact)
     
     # Create headers for the PUT request
@@ -326,7 +302,7 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     specified Nextcloud addressbook. It converts the Contact object to a vCard
     using the vobject library and sends it to the server.
     
-    The contact must have a valid UID. If vcs_uri is provided, it will be used as the
+    The contact must have a valid UID. If url is provided, it will be used as the
     update URL. Otherwise, the function will construct a URL based on the carddav_url
     and the contact's UID.
     
@@ -356,21 +332,21 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
         raise ValueError("Contact must have a UID to be updated")
     
     # Determine the URL to use for the update
-    if contact.vcs_uri:
-        # Use the existing vcs_uri if available
-        contact_url = contact.vcs_uri
+    if contact.url:
+        # Use the existing url if available
+        contact_url = contact.url
     else:
         # Construct a URL based on the carddav_url and UID
         base_url = carddav_url if carddav_url.endswith('/') else f"{carddav_url}/"
         contact_filename = f"{contact.uid}.vcf"
         contact_url = f"{base_url}{contact_filename}"
         
-        # Update the contact's vcs_uri if it wasn't already set
-        contact.vcs_uri = contact_url
+        # Update the contact's url if it wasn't already set (with validation)
+        contact.url = validate_and_correct_url(contact_url)
 
     logger.debug(f"updating contact at URL: {contact_url}")
     
-    # Generate the vCard data with the updated vcs_uri
+    # Generate the vCard data with the updated url
     vcard_data = contact_to_vcard(contact)
     
     # Create headers for the PUT request

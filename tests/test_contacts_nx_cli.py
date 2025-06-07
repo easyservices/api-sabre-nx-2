@@ -194,7 +194,7 @@ async def create_contact_test(is_debug=False):
         if is_debug:
             print("\n--- Create Contact Result ---")
             print(f"Contact created successfully with UID: {created_contact.uid}")
-            print(f"vCard URI: {created_contact.vcs_uri}")
+            print(f"vCard URL: {created_contact.url}")
             print(json.dumps(created_contact.model_dump(), indent=4))
             print("-------------")
         
@@ -274,7 +274,7 @@ async def update_contact_test(contact_to_update=None, is_debug=False):
             print(f"Contact updated successfully with UID: {updated_contact.uid}")
             print(f"Original name: {original_name}")
             print(f"Updated name: {updated_contact.full_name}")
-            print(f"vCard URI: {updated_contact.vcs_uri}")
+            print(f"vCard URL: {updated_contact.url}")
             print(json.dumps(updated_contact.model_dump(), indent=4))
             print("-------------")
         
@@ -393,7 +393,7 @@ async def get_contact_by_uid_test(contact_to_retrieve=None, is_debug=False):
             if retrieved_contact:
                 print(f"Contact retrieved successfully with UID: {retrieved_contact.uid}")
                 print(f"Full name: {retrieved_contact.full_name}")
-                print(f"vCard URI: {retrieved_contact.vcs_uri}")
+                print(f"vCard URL: {retrieved_contact.url}")
                 print(json.dumps(retrieved_contact.model_dump(), indent=4))
             else:
                 print(f"No contact found with UID: {uid}")

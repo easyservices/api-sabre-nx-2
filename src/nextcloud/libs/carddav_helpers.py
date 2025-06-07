@@ -13,6 +13,7 @@ from src.models.contact import Address, Contact, Email, Phone
 from typing import List, Dict, Any, Optional
 import vobject
 import xml.etree.ElementTree as ET
+from urllib.parse import urlparse, urlunparse
 
 from src.nextcloud import (
     API_ERR_ADDRESSBOOK_NOT_FOUND,
@@ -22,6 +23,7 @@ from src.nextcloud import (
     API_ERR_SERVER_UNATTENDED_RESPONSE
 )
 from src.nextcloud.libs import PRIVACY_MODE_TXT
+from src.nextcloud.config import NEXTCLOUD_BASE_URL
 from src import logger
 
 
@@ -124,7 +126,7 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
     
     Args:
         vcard_data (str): vCard data as string.
-        href (Optional[str]): The href/URI of the vCard.
+        href (Optional[str]): The href/URL of the vCard.
         
     Returns:
         Optional[Contact]: Contact object or None if parsing fails.
@@ -295,7 +297,7 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
             emails=emails,
             phones=phones,
             addresses=addresses,
-            vcs_uri=href,
+            url=href,
             birthday=birthday,
             notes=notes,
             groups=groups
@@ -487,3 +489,103 @@ def create_vcard_headers(auth_header: str) -> Dict[str, str]:
         "Content-Type": "text/vcard; charset=utf-8",
         "authorization": auth_header
     }
+
+
+def validate_and_correct_url(url: str) -> str:
+    """
+    Validate and correct a URL to ensure it uses the correct base URL from configuration.
+    
+    This function checks if the given URL has the correct hostname and base path
+    according to the configuration. If the hostname or base URL is wrong or missing,
+    it will be replaced with the correct one from the Nextcloud configuration.
+    
+    Args:
+        url (str): The URL to validate and potentially correct.
+        
+    Returns:
+        str: The corrected URL with the proper base URL from configuration.
+        
+    Examples:
+        >>> validate_and_correct_url("https://wrong.example.com/remote.php/dav/addressbooks/users/test/")
+        "https://good.example.com:12200/remote.php/dav/addressbooks/users/test/"
+        
+        >>> validate_and_correct_url("/remote.php/dav/addressbooks/users/test/")
+        "https://good.example.com:12200/remote.php/dav/addressbooks/users/test/"
+        
+        >>> validate_and_correct_url("remote.php/dav/addressbooks/users/test/")
+        "https://good.example.com:12200/remote.php/dav/addressbooks/users/test/"
+    """
+    # Parse the configuration base URL to get the correct components
+    config_parsed = urlparse(NEXTCLOUD_BASE_URL)
+    
+    # Parse the input URL
+    input_parsed = urlparse(url)
+    
+    # If the input URL is relative (no scheme or netloc), construct the full URL
+    if not input_parsed.scheme or not input_parsed.netloc:
+        # Handle cases where URL starts with '/' or is completely relative
+        path = input_parsed.path if input_parsed.path.startswith('/') else f"/{input_parsed.path}"
+        
+        corrected_url = urlunparse((
+            config_parsed.scheme,      # Use config scheme (https)
+            config_parsed.netloc,      # Use config netloc (hostname:port)
+            path,                      # Use the provided path
+            input_parsed.params,       # Preserve params
+            input_parsed.query,        # Preserve query
+            input_parsed.fragment      # Preserve fragment
+        ))
+    else:
+        # URL has scheme and netloc, check if they match the configuration
+        if (input_parsed.scheme != config_parsed.scheme or
+            input_parsed.netloc != config_parsed.netloc):
+            
+            # Replace with correct scheme and netloc from configuration
+            corrected_url = urlunparse((
+                config_parsed.scheme,      # Use config scheme
+                config_parsed.netloc,      # Use config netloc
+                input_parsed.path,         # Keep original path
+                input_parsed.params,       # Preserve params
+                input_parsed.query,        # Preserve query
+                input_parsed.fragment      # Preserve fragment
+            ))
+        else:
+            # URL is already correct
+            corrected_url = url
+    
+    return corrected_url
+
+
+def parse_contacts_from_response(parsed_data: List[Dict[str, Any]], privacy: Optional[bool] = False) -> List[Contact]:
+    """
+    Parse contacts from CardDAV response data.
+    
+    This function processes a list of parsed CardDAV response items and converts them
+    to Contact objects. It handles error logging and optionally validates/corrects
+    the href URLs using the validate_and_correct_url function.
+    
+    Args:
+        parsed_data (List[Dict[str, Any]]): List of dictionaries containing href and vcard_data.
+        privacy (Optional[bool]): Enable privacy mode to mask sensitive values. Defaults to False.
+        
+    Returns:
+        List[Contact]: List of successfully parsed Contact objects.
+    """
+    contacts = []
+    for i, item in enumerate(parsed_data):
+        href = item.get('href', None)
+        if href:
+            href = validate_and_correct_url(href)
+        try:
+            contact = parse_vcard_to_contact(item['vcard_data'], href, privacy)
+            if contact:
+                contacts.append(contact)
+            else:
+                logger.error(f"Warning: Failed to parse contact #{i+1} at href: {href}")
+        except Exception as e:
+            logger.error(f"Error parsing contact #{i+1}: {e}")
+            logger.error(f"Contact href: {href}")
+            logger.error(f"vCard data (first 200 chars): {item.get('vcard_data', '')[:200]}")
+            # Continue processing other contacts instead of failing completely
+            continue
+    
+    return contacts

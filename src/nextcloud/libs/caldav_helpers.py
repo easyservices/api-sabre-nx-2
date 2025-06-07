@@ -16,6 +16,7 @@ from datetime import datetime
 
 from src.models.event import Event, Attendee, Reminder
 from src.nextcloud.libs import PRIVACY_MODE_TXT
+from src.nextcloud.libs.carddav_helpers import validate_and_correct_url
 
 def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] = False) -> Event:
     """
@@ -65,7 +66,7 @@ def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] 
                         summary=str(component.get("SUMMARY", "")),
                         description=description,
                         location=str(component.get("LOCATION", "")) if component.get("LOCATION") else None,
-                        url=event_url,
+                        url=validate_and_correct_url(event_url) if event_url else None,
                         status=str(component.get("STATUS", "")) if component.get("STATUS") else None,
                         organizer=str(component.get("ORGANIZER", "")).replace("mailto:", "") if component.get("ORGANIZER") else None,
                         categories=categories if categories else None,
@@ -475,3 +476,41 @@ def create_caldav_event_headers(auth_header: str) -> Dict[str, str]:
         "Content-Type": "text/calendar; charset=utf-8",
         "authorization": auth_header
     }
+
+
+def parse_events_from_response(parsed_data: List[Dict[str, Any]], privacy: Optional[bool] = False) -> List[Event]:
+    """
+    Parse events from CalDAV response data.
+    
+    This function processes a list of parsed CalDAV response items and converts them
+    to Event objects. It handles error logging and validates/corrects the href URLs
+    using the validate_and_correct_url function, similar to how contacts are processed.
+    
+    Args:
+        parsed_data (List[Dict[str, Any]]): List of dictionaries containing href and calendar_data.
+        privacy (Optional[bool]): Enable privacy mode to mask sensitive values. Defaults to False.
+        
+    Returns:
+        List[Event]: List of successfully parsed Event objects.
+    """
+    from src import logger
+    
+    events = []
+    for i, item in enumerate(parsed_data):
+        href = item.get('href', None)
+        if href:
+            href = validate_and_correct_url(href)
+        try:
+            event = parse_ical_to_event(item['calendar_data'], href, privacy)
+            if event:
+                events.append(event)
+            else:
+                logger.error(f"Warning: Failed to parse event #{i+1} at href: {href}")
+        except Exception as e:
+            logger.error(f"Error parsing event #{i+1}: {e}")
+            logger.error(f"Event href: {href}")
+            logger.error(f"Calendar data (first 200 chars): {item.get('calendar_data', '')[:200]}")
+            # Continue processing other events instead of failing completely
+            continue
+    
+    return events
