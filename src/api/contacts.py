@@ -11,6 +11,8 @@ from src.common.sec import authenticate_with_nextcloud
 from src.models.contact import Contact, ContactSearchCriteria
 from src.models.api_params import UidParam
 from src.nextcloud.contacts import get_all_contacts, search_contacts, create_contact, update_contact, delete_contact, get_contact_by_uid
+# import all you need from fastapi-pagination
+from fastapi_pagination import Page, paginate
 
 
 IS_DEBUG = False
@@ -523,13 +525,13 @@ async def delete_contact_endpoint(
 @router.get(
     "/",
     operation_id="get_all_contacts",
-    response_model=List[Contact],
+    response_model=Page[Contact],
     summary="Get all contacts",
     description="Retrieve all contacts from the Nextcloud CardDAV addressbook",
     responses={
         200: {
             "description": "Contacts retrieved successfully",
-            "model": List[Contact],
+            "model": Page[Contact],
         },
         401: {
             "description": "Authentication failed",
@@ -573,7 +575,7 @@ async def get_all_contacts_endpoint(
         example=False
     ),
     credentials: HTTPBasicCredentials = Depends(security)
-) -> List[Contact]:
+) -> Page[Contact]:
     """
     Retrieve all contacts from the Nextcloud CardDAV addressbook.
     
@@ -631,7 +633,7 @@ async def get_all_contacts_endpoint(
             print(f"Error fetching contacts from Nextcloud: {e}")
         raise HTTPException(status_code=503, detail="Could not retrieve contacts from backend")
 
-    return contacts
+    return paginate(contacts)
 
 
 

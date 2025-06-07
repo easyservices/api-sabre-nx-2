@@ -52,6 +52,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from src.common.add_proxy import CustomProxyHeadersMiddleware
 from src.common.sec import authenticate_with_nextcloud
 from src.common import security
+from fastapi_pagination import add_pagination
 
 # Load configuration
 fastapi_config = load_fastapi_config()
@@ -73,6 +74,8 @@ app.add_middleware(CustomProxyHeadersMiddleware)
 # (Optionnel) Ajoute TrustedHostMiddleware si tu veux restreindre les hôtes autorisés
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=fastapi_config['fastapi']['allowed_hosts'])
 
+# Add pagination support to the FastAPI app
+add_pagination(app)
 
 # Add utility endpoints for health checks and other utility functions
 app.include_router(
