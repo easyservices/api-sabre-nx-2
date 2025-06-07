@@ -26,9 +26,7 @@ from src.nextcloud.libs.caldav_helpers import (
     event_to_ical,
     create_caldav_event_headers
 )
-
-# Constants
-IS_DEBUG = True
+from src import logger
 
 async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Event]:
     """
@@ -50,16 +48,13 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar
         HTTPException: For authentication, authorization, server, or parsing errors.
         ValueError: If the uid is empty or None.
     """
-    if IS_DEBUG:
-        print(f"get_event_by_uid: credentials: {credentials}")
+    logger.debug(f"get_event_by_uid: retrieving event with UID: {uid} with privacy mode: {privacy}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"get_event_by_uid: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
-    if IS_DEBUG:
-        print(f"get_event_by_uid: caldav_url: {caldav_url}")
+    logger.debug(f"get_event_by_uid: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Validate the UID
@@ -73,8 +68,7 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar
     event_filename = f"{uid}.ics"
     event_url = f"{base_url}{event_filename}"
     
-    if IS_DEBUG:
-        print(f"Retrieving event at URL: {event_url}")
+    logger.debug(f"Retrieving event at URL: {event_url}")
     
     # Create headers for the GET request
     headers = {
@@ -131,16 +125,13 @@ async def get_events_by_time_range(
         HTTPException: For authentication, authorization, server, or parsing errors.
         ValueError: If the datetime parameters are invalid.
     """
-    if IS_DEBUG:
-        print(f"get_events_by_time_range: credentials: {credentials}")
+    logger.debug(f"get_events_by_time_range: retrieving events between {start_datetime} and {end_datetime} with privacy mode: {privacy}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"get_events_by_time_range: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
-    if IS_DEBUG:
-        print(f"get_events_by_time_range: caldav_url: {caldav_url}")
+    logger.debug(f"get_events_by_time_range: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Validate the datetime parameters
@@ -150,8 +141,7 @@ async def get_events_by_time_range(
     # Ensure the URL ends with a slash
     base_url = caldav_url if caldav_url.endswith('/') else f"{caldav_url}/"
     
-    if IS_DEBUG:
-        print(f"Retrieving events between {start_datetime} and {end_datetime} from {base_url}")
+    logger.debug(f"Retrieving events between {start_datetime} and {end_datetime} from {base_url}")
     
     # Create headers for the REPORT request
     headers = create_caldav_request_headers(auth_header)
@@ -184,14 +174,12 @@ async def get_events_by_time_range(
                             event = parse_ical_to_event(calendar_data, href, privacy)
                             events.append(event)
                         except ValueError as e:
-                            if IS_DEBUG:
-                                print(f"Error parsing event: {e}")
+                            logger.error(f"Error parsing event: {e}")
                 
                 # Sort events by start datetime
                 events.sort(key=lambda event: event.start if event.start else "")
                 
-                if IS_DEBUG:
-                    print(f"Sorted {len(events)} events by start datetime")
+                logger.debug(f"Sorted {len(events)} events by start datetime")
                 
                 return events
                 
@@ -219,16 +207,13 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
         HTTPException: For authentication, authorization, server, or parsing errors.
         ValueError: If the event is invalid or missing required fields.
     """
-    if IS_DEBUG:
-        print(f"create_event: credentials: {credentials}")
+    logger.debug(f"create_event: received event to create: {event}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"create_event: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
-    if IS_DEBUG:
-        print(f"create_event: caldav_url: {caldav_url}")
+    logger.debug(f"create_event: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Validate the event
@@ -249,14 +234,12 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
     event_filename = f"{event.uid}.ics"
     event_url = f"{base_url}{event_filename}"
     
-    if IS_DEBUG:
-        print(f"Creating event at URL: {event_url}")
+    logger.debug(f"Creating event at URL: {event_url}")
     
     # Convert the Event object to iCalendar format
     ical_data = event_to_ical(event)
     
-    if IS_DEBUG:
-        print(f"iCalendar data:\n{ical_data}")
+    logger.debug(f"iCalendar data:\n{ical_data}")
     
     # Create headers for the PUT request
     headers = create_caldav_event_headers(auth_header)
@@ -277,8 +260,7 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
                 # Update the event URL
                 event.url = event_url
                 
-                if IS_DEBUG:
-                    print(f"Event created successfully with UID: {event.uid}")
+                logger.debug(f"Event created successfully with UID: {event.uid}")
                 
                 return event
                 
@@ -306,16 +288,13 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
         HTTPException: For authentication, authorization, server, or parsing errors.
         ValueError: If the event is invalid, missing required fields, or not found.
     """
-    if IS_DEBUG:
-        print(f"update_event: credentials: {credentials}")
+    logger.debug(f"update_event: updating event with UID: {event.uid}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"update_event: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
-    if IS_DEBUG:
-        print(f"update_event: caldav_url: {caldav_url}")
+    logger.debug(f"update_event: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Validate the event
@@ -335,8 +314,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     event_filename = f"{event.uid}.ics"
     event_url = f"{base_url}{event_filename}"
     
-    if IS_DEBUG:
-        print(f"Updating event at URL: {event_url}")
+    logger.debug(f"Updating event at URL: {event_url}")
     
     # Optional: Check if the event exists
     existing_event = await get_event_by_uid(credentials, event.uid, calendar_name)
@@ -353,8 +331,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     # Convert the Event object to iCalendar format
     ical_data = event_to_ical(event)
     
-    if IS_DEBUG:
-        print(f"iCalendar data for update:\n{ical_data}")
+    logger.debug(f"iCalendar data for update:\n{ical_data}")
     
     # Create headers for the PUT request
     headers = create_caldav_event_headers(auth_header)
@@ -375,8 +352,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
                 # Update the event URL (in case it changed)
                 event.url = event_url
                 
-                if IS_DEBUG:
-                    print(f"Event updated successfully with UID: {event.uid}")
+                logger.debug(f"Event updated successfully with UID: {event.uid}")
                 
                 return event
                 
@@ -403,16 +379,13 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
         HTTPException: For authentication, authorization, server, or connection errors.
         ValueError: If the uid is empty or None.
     """
-    if IS_DEBUG:
-        print(f"delete_event: credentials: {credentials}")
+    logger.debug(f"delete_event: deleting event with UID: {uid}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"delete_event: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
-    if IS_DEBUG:
-        print(f"delete_event: caldav_url: {caldav_url}")
+    logger.debug(f"delete_event: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Validate the UID
@@ -426,14 +399,12 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
     event_filename = f"{uid}.ics"
     event_url = f"{base_url}{event_filename}"
     
-    if IS_DEBUG:
-        print(f"Deleting event at URL: {event_url}")
+    logger.debug(f"Deleting event at URL: {event_url}")
     
     # Optional: Check if the event exists
     existing_event = await get_event_by_uid(credentials, uid, calendar_name)
     if not existing_event:
-        if IS_DEBUG:
-            print(f"Event with UID {uid} not found, nothing to delete")
+        logger.debug(f"Event with UID {uid} not found, nothing to delete")
         return False
     
     # Create headers for the DELETE request
@@ -452,16 +423,14 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
                 
                 # If event not found, return False
                 if status_code == 404:
-                    if IS_DEBUG:
-                        print(f"Event with UID {uid} not found on server")
+                    logger.debug(f"Event with UID {uid} not found on server")
                     return False
                 
                 # Handle error responses
                 if status_code not in (200, 204):  # 200 OK or 204 No Content are success codes for deletion
                     handle_caldav_response_status(status_code, response_text)
                 
-                if IS_DEBUG:
-                    print(f"Event deleted successfully with UID: {uid}")
+                logger.debug(f"Event deleted successfully with UID: {uid}")
                 
                 return True
                 

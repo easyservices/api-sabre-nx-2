@@ -5,8 +5,7 @@ from src.common.sec import authenticate_with_nextcloud
 from src.models.contact import Contact
 from .. import mcp
 from src.nextcloud.contacts import get_all_contacts as nx_get_all_contacts
-
-IS_DEBUG = True  # Set to False in production
+from src import logger
 
 
 @mcp.tool()
@@ -17,8 +16,7 @@ def calculate_bmi(weight_kg: float, height_m: float) -> float:
 @mcp.tool()
 async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: Optional[str] = None) -> List[Contact]:
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"get_all_contacts: user_info: {user_info}")
+    logger.debug(f"get_all_contacts: user_info: {user_info}")
     
     try:
         contacts = await nx_get_all_contacts(
@@ -26,8 +24,8 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
         )
     except Exception as e:
         # Handle potential errors during the fetch from Nextcloud
-        if IS_DEBUG:
-            print(f"Error fetching contacts from Nextcloud: {e}")
+        res_txt = f"Error fetching contacts from Nextcloud: {e}"
+        logger.error(res_txt)
         raise HTTPException(status_code=503, detail="Could not retrieve contacts from backend")
 
     return contacts

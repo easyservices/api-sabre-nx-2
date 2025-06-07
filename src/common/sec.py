@@ -41,6 +41,7 @@ import requests
 from fastapi.security import HTTPBasicCredentials
 from src.nextcloud.config import NEXTCLOUD_BASE_URL
 from cachetools import TTLCache
+from src import logger
 
 # Cache with max 100 users, 300 seconds (5 min) TTL
 auth_cache = TTLCache(maxsize=100, ttl=300)
@@ -93,7 +94,7 @@ def authenticate_with_nextcloud(credentials: HTTPBasicCredentials):
         
         creds = HTTPBasicCredentials(username="user", password="pass")
         user_info = authenticate_with_nextcloud(creds)
-        print(f"Authenticated user: {user_info['id']}")
+        logger.debug(f"Authenticated user: {user_info['id']}")
         ```
     """
     key = cache_key(credentials)

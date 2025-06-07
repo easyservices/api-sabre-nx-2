@@ -5,6 +5,7 @@ import yaml
 import os
 from src.common import load_config
 from src.common.libs.helpers import UserSettings
+from src import logger
 
 
 def _create_users_dict() -> dict[str, UserSettings]:

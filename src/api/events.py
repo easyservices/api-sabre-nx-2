@@ -9,8 +9,7 @@ from src.common.sec import authenticate_with_nextcloud
 from src.models.event import Event
 from src.models.api_params import UidParam, EventsQueryParams
 from src.nextcloud.events import get_event_by_uid, get_events_by_time_range, create_event, update_event, delete_event
-
-IS_DEBUG = True
+from src import logger
 
 # --- Router Definition ---
 # We're using the get_user_settings dependency directly in each endpoint
@@ -140,13 +139,11 @@ async def read_event_endpoint(
     or omitted from the response to protect confidential information.
     """
     try:
-        if IS_DEBUG:
-            print(f"Retrieving event with UID: {uid}")
+        logger.debug(f"Retrieving event with UID: {uid} with privacy mode: {privacy}")
         
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"read_event_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the get_event_by_uid function to retrieve the event from the server
         event = await get_event_by_uid(
@@ -158,17 +155,21 @@ async def read_event_endpoint(
         
         # If event is not found, raise a 404 error
         if event is None:
-            raise HTTPException(status_code=404, detail=f"Event with UID {uid} not found")
+            res_txt = f"Event with UID {uid} not found"
+            logger.error(res_txt)
+            raise HTTPException(status_code=404, detail=res_txt)
         
         return event
         
     except ValueError as e:
         # Handle validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error retrieving event: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not retrieve event: {str(e)}")
+        res_txt = f"Could not retrieve event: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 @router.get(
@@ -305,13 +306,11 @@ async def read_events_by_time_range_endpoint(
     or omitted from the response to protect confidential information.
     """
     try:
-        if IS_DEBUG:
-            print(f"Retrieving events between {start_datetime} and {end_datetime}")
+        logger.debug(f"Retrieving events between {start_datetime} and {end_datetime} with privacy mode: {privacy}")
         
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"read_events_by_time_range_endpoint: user_info: {user_info.get('id', 'not authenticated')}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the get_events_by_time_range function to retrieve events from the server
         events = await get_events_by_time_range(
@@ -322,18 +321,17 @@ async def read_events_by_time_range_endpoint(
             privacy=privacy
         )
         
-        if IS_DEBUG:
-            print(f"Retrieved {len(events)} events")
-        
         return events
         
     except ValueError as e:
         # Handle validation errors (e.g., invalid datetime format)
-        raise HTTPException(status_code=400, detail=str(e))
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error retrieving events: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not retrieve events: {str(e)}")
+        res_txt = f"Could not retrieve events: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 @router.post(
@@ -458,13 +456,11 @@ async def create_event_endpoint(
     or omitted from the response to protect confidential information.
     """
     try:
-        if IS_DEBUG:
-            print(f"Creating event with summary: {event.summary}")
+        logger.debug(f"Received event to create: {event}")
         
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"create_event_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the create_event function to create the event on the server
         created_event = await create_event(
@@ -473,18 +469,17 @@ async def create_event_endpoint(
             calendar_name=calendar_name
         )
         
-        if IS_DEBUG:
-            print(f"Event created successfully with UID: {created_event.uid}")
-        
         return created_event
         
     except ValueError as e:
         # Handle validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error creating event: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not create event: {str(e)}")
+        res_txt = f"Could not create event: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 @router.put(
@@ -608,17 +603,21 @@ async def update_event_endpoint(
     or omitted from the response to protect confidential information.
     """
     try:
-        if IS_DEBUG:
-            print(f"Updating event with UID: {uid}")
-        
-        # Authenticate with Nextcloud
-        user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"update_event_endpoint: user_info: {user_info}")
+        logger.debug(f"Updating event with UID: {uid}")
         
         # Ensure the UID in the path matches the UID in the event data
         if event.uid and event.uid != uid:
-            raise ValueError(f"UID mismatch: {uid} in path vs {event.uid} in event data")
+            res_txt = f"UID in path ({uid}) doesn't match event UID ({event.uid})"
+            logger.error(res_txt)
+            raise HTTPException(
+                status_code=400,
+                detail=res_txt
+            )
+        logger.debug(f"Updating event with UID: {uid}")
+        
+        # Authenticate with Nextcloud
+        user_info = authenticate_with_nextcloud(credentials)
+        logger.debug(f"User credentials: {user_info}")
         
         # Set the UID from the path if not provided in the event data
         if not event.uid:
@@ -631,18 +630,17 @@ async def update_event_endpoint(
             calendar_name=calendar_name
         )
         
-        if IS_DEBUG:
-            print(f"Event updated successfully with UID: {updated_event.uid}")
-        
         return updated_event
         
     except ValueError as e:
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
         # Handle validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error updating event: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not update event: {str(e)}")
+        res_txt = f"Could not update event: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 @router.delete(
@@ -747,13 +745,11 @@ async def delete_event_endpoint(
     or omitted from the response to protect confidential information.
     """
     try:
-        if IS_DEBUG:
-            print(f"Deleting event with UID: {uid}")
+        logger.debug(f"Deleting event with UID: {uid}")
         
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"delete_event_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the delete_event function to delete the event from the server
         result = await delete_event(
@@ -764,18 +760,19 @@ async def delete_event_endpoint(
         
         # If the event was not found, return a 404 error
         if not result:
-            raise HTTPException(status_code=404, detail=f"Event with UID {uid} not found")
-        
-        if IS_DEBUG:
-            print(f"Event deleted successfully with UID: {uid}")
+            res_txt = f"Event with UID {uid} not found"
+            logger.error(res_txt)
+            raise HTTPException(status_code=404, detail=res_txt)
         
         # Return 204 No Content on successful deletion
         return None
         
     except ValueError as e:
         # Handle validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error deleting event: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not delete event: {str(e)}")
+        res_txt = f"Could not delete event: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)

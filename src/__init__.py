@@ -5,3 +5,6 @@
 
 This package serves as the root for all src-related modules and subpackages.
 """
+import logging
+
+logger = logging.getLogger('uvicorn.error')

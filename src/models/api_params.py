@@ -26,6 +26,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator, validator
 from datetime import datetime
 import re
+from src import logger
 
 
 class UidParam(BaseModel):
@@ -40,7 +41,7 @@ class UidParam(BaseModel):
         description="Unique identifier (UID) for the resource",
         min_length=1,
         max_length=255,
-        example="550e8400-e29b-41d4-a716-446655440000"
+        json_schema_extra={"example": "550e8400-e29b-41d4-a716-446655440000"}
     )
     
     @field_validator('uid')
@@ -67,12 +68,12 @@ class DateTimeRangeParams(BaseModel):
     start_datetime: str = Field(
         ...,
         description="Start datetime in ISO format (YYYY-MM-DDTHH:MM:SS)",
-        example="2025-04-21T00:00:00"
+        json_schema_extra={"example": "2025-04-21T00:00:00"}
     )
     end_datetime: str = Field(
         ...,
         description="End datetime in ISO format (YYYY-MM-DDTHH:MM:SS)",
-        example="2025-04-28T23:59:59"
+        json_schema_extra={"example": "2025-04-28T23:59:59"}
     )
     
     @field_validator('start_datetime', 'end_datetime')
@@ -104,17 +105,17 @@ class EventsQueryParams(BaseModel):
     start_datetime: str = Field(
         ...,
         description="Start datetime in ISO format (YYYY-MM-DDTHH:MM:SS)",
-        example="2025-04-21T00:00:00"
+        json_schema_extra={"example": "2025-04-21T00:00:00"}
     )
     end_datetime: str = Field(
         ...,
         description="End datetime in ISO format (YYYY-MM-DDTHH:MM:SS)",
-        example="2025-04-28T23:59:59"
+        json_schema_extra={"example": "2025-04-28T23:59:59"}
     )
     calendar_name: Optional[str] = Field(
         None,
         description="Optional calendar name to filter events from a specific calendar",
-        example="personal"
+        json_schema_extra={"example": "personal"}
     )
     
     @field_validator('start_datetime', 'end_datetime')

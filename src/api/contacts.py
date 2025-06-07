@@ -13,9 +13,7 @@ from src.models.api_params import UidParam
 from src.nextcloud.contacts import get_all_contacts, search_contacts, create_contact, update_contact, delete_contact, get_contact_by_uid
 # import all you need from fastapi-pagination
 from fastapi_pagination import Page, paginate
-
-
-IS_DEBUG = False
+from src import logger
 
 # --- Router Definition ---
 # We're using the get_user_settings dependency directly in each endpoint
@@ -108,13 +106,12 @@ async def create_contact_endpoint(
     The UID must be unique within the addressbook.
     """
     try:
-        if IS_DEBUG:
-            print(f"Received contact to create: {contact}")
-        
+
+        logger.debug(f"Received contact to create: {contact}")
+
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"create_contact_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the create_contact function to create the contact on the server
         created_contact = await create_contact(
@@ -125,9 +122,9 @@ async def create_contact_endpoint(
         return created_contact
         
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error creating contact: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not create contact: {str(e)}")
+        res_txt = f"Could not create contact: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 
@@ -236,13 +233,11 @@ async def read_contact_endpoint(
     or omitted from the response to protect confidential information.
     """
     try:
-        if IS_DEBUG:
-            print(f"Retrieving contact with UID: {uid}")
+        logger.debug(f"Retrieving contact with UID: {uid} with privacy mode: {privacy}")
         
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"read_contact_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the get_contact_by_uid function to retrieve the contact from the server
         contact = await get_contact_by_uid(
@@ -253,17 +248,21 @@ async def read_contact_endpoint(
         
         # If contact is not found, raise a 404 error
         if contact is None:
-            raise HTTPException(status_code=404, detail=f"Contact with UID {uid} not found")
+            res_txt = f"Contact with UID {uid} not found"
+            logger.error(res_txt)
+            raise HTTPException(status_code=404, detail=res_txt)
         
         return contact
         
     except ValueError as e:
         # Handle validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error retrieving contact: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not retrieve contact: {str(e)}")
+        res_txt = f"Could not retrieve contact: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 
@@ -371,19 +370,21 @@ async def update_contact_endpoint(
     the URL is constructed from the addressbook path and contact UID.
     """
     try:
+        logger.debug(f"Updating contact with UID: {uid}")
+
         # Ensure the UID in the path matches the contact's UID
         if contact_update.uid != uid:
+            res_txt = f"UID in path ({uid}) doesn't match contact UID ({contact_update.uid})"
+            logger.error(res_txt)
             raise HTTPException(
                 status_code=400,
-                detail=f"UID in path ({uid}) doesn't match contact UID ({contact_update.uid})"
+                detail=res_txt
             )
-        if IS_DEBUG:
-            print(f"Updating contact with UID: {uid}")
+        logger.debug(f"Updating contact with UID: {uid}")
         
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"update_contact_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the update_contact function to update the contact on the server
         updated_contact = await update_contact(
@@ -394,12 +395,14 @@ async def update_contact_endpoint(
         return updated_contact
         
     except ValueError as e:
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
         # Handle validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error updating contact: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not update contact: {str(e)}")
+        res_txt = f"Could not update contact: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 
@@ -495,13 +498,11 @@ async def delete_contact_endpoint(
     - The UID cannot be reused for new contacts in the same addressbook
     """
     try:
-        if IS_DEBUG:
-            print(f"Deleting contact with UID: {uid}")
+        logger.debug(f"Deleting contact with UID: {uid}")
         
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"delete_contact_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         # Call the delete_contact function to delete the contact from the server
         result = await delete_contact(
@@ -513,12 +514,14 @@ async def delete_contact_endpoint(
         return None
         
     except ValueError as e:
+        res_txt = f"ValueError: {str(e)}"
+        logger.error(res_txt)
         # Handle validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=res_txt)
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error deleting contact: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not delete contact: {str(e)}")
+        res_txt = f"Could not delete contact: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
 
 
@@ -618,9 +621,10 @@ async def get_all_contacts_endpoint(
     **Note:** When privacy mode is enabled, certain sensitive fields may be masked
     or omitted from the response to protect confidential information.
     """
+    logger.debug(f"Get all contacts with privacy mode: {privacy}")
+
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"get_all_contacts_endpoint: user_info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     try:
         contacts = await get_all_contacts(
@@ -629,9 +633,9 @@ async def get_all_contacts_endpoint(
         )
     except Exception as e:
         # Handle potential errors during the fetch from Nextcloud
-        if IS_DEBUG:
-            print(f"Error fetching contacts from Nextcloud: {e}")
-        raise HTTPException(status_code=503, detail="Could not retrieve contacts from backend")
+        res_txt = f"Could not get all contacts: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
     return paginate(contacts)
 
@@ -750,10 +754,12 @@ async def search_contacts_endpoint(
     or omitted from the response to protect confidential information.
     """
     try:
+
+        logger.debug(f"Get contacts using search criterias: {search_criteria} with privacy mode: {privacy}")
+
         # Authenticate with Nextcloud
         user_info = authenticate_with_nextcloud(credentials)
-        if IS_DEBUG:
-            print(f"search_contacts_endpoint: user_info: {user_info}")
+        logger.debug(f"User credentials: {user_info}")
         
         contacts = await search_contacts(
             credentials=credentials,
@@ -761,8 +767,8 @@ async def search_contacts_endpoint(
             privacy=privacy
         )
     except Exception as e:
-        if IS_DEBUG:
-            print(f"Error searching contacts from Nextcloud: {e}")
-        raise HTTPException(status_code=503, detail=f"Could not search contacts: {str(e)}")
+        res_txt = f"Could not search contacts: {str(e)}"
+        logger.error(res_txt)
+        raise HTTPException(status_code=503, detail=res_txt)
 
     return contacts

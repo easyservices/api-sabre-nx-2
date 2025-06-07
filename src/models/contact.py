@@ -19,6 +19,7 @@ The module includes:
 from typing import List, Optional, Literal
 import uuid
 from pydantic import BaseModel, Field
+from src import logger
 
 class Address(BaseModel):
     """

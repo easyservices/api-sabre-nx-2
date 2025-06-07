@@ -233,7 +233,7 @@ def test_delete_event(event_uid=None, is_debug=False):
         created_event = test_create_event(is_debug=is_debug)
         if not created_event:
             print("Failed to create a new event for delete test")
-            return False
+            return None
         event_uid = created_event.get('uid')
     
     if is_debug:
@@ -261,7 +261,7 @@ def test_delete_event(event_uid=None, is_debug=False):
         return True
     else:
         print(f"Error: {response.text}")
-        return False
+        return None
 
 
 # Run the tests
@@ -309,7 +309,7 @@ if __name__ == "__main__":
     # Test delete_event (using the event we just updated)
     deleted = test_delete_event(updated_event.get('uid'), is_debug=False)
     
-    if not deleted:
+    if deleted is None:
         print(f"FAILURE: test_delete_event did not delete the event")
         sys.exit(1)
     print(f"SUCCESS: test_delete_event deleted the event with UID: {updated_event.get('uid')}")

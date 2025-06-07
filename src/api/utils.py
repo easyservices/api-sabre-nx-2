@@ -7,10 +7,7 @@ from fastapi.security import HTTPBasicCredentials
 from src.common import security
 from src.models.api_params import StatusQueryParams
 from src.common.sec import authenticate_with_nextcloud
-
-
-
-IS_DEBUG = False
+from src import logger
 
 # --- Router Definition ---
 # We're using the get_user_settings dependency directly in each endpoint
@@ -77,5 +74,5 @@ async def get_status(credentials: HTTPBasicCredentials = Depends(security)):
     and can successfully authenticate with Nextcloud.
     """
     user_info = authenticate_with_nextcloud(credentials)
-    #print(f"User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     return {"status": "running"}

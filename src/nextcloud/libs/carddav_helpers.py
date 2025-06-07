@@ -22,6 +22,7 @@ from src.nextcloud import (
     API_ERR_SERVER_UNATTENDED_RESPONSE
 )
 from src.nextcloud.libs import PRIVACY_MODE_TXT
+from src import logger
 
 
 def create_request_headers(auth_header: str) -> Dict[str, str]:
@@ -147,8 +148,8 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
                         tag = str(e.type_param) if hasattr(e, 'type_param') and e.type_param is not None else ""
                         emails.append(Email(email=str(e.value), tag=tag))
                     except Exception as email_error:
-                        print(f"Error parsing email for contact UID {uid}: {email_error}")
-                        print(f"Email object: {e}")
+                        logger.error(f"Error parsing email for contact UID {uid}: {email_error}")
+                        logger.error(f"Email object: {e}")
                         # Add email without tag as fallback
                         emails.append(Email(email=str(e.value), tag=""))
         
@@ -162,8 +163,8 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
                         tag = str(p.type_param) if hasattr(p, 'type_param') and p.type_param is not None else ""
                         phones.append(Phone(number=str(p.value), tag=tag))
                     except Exception as phone_error:
-                        print(f"Error parsing phone for contact UID {uid}: {phone_error}")
-                        print(f"Phone object: {p}")
+                        logger.error(f"Error parsing phone for contact UID {uid}: {phone_error}")
+                        logger.error(f"Phone object: {p}")
                         # Add phone without tag as fallback
                         phones.append(Phone(number=str(p.value), tag=""))
         
@@ -194,8 +195,8 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
                             tag=tag
                         ))
                     except Exception as address_error:
-                        print(f"Error parsing address for contact UID {uid}: {address_error}")
-                        print(f"Address object: {adr}")
+                        logger.error(f"Error parsing address for contact UID {uid}: {address_error}")
+                        logger.error(f"Address object: {adr}")
                         # Add address without tag as fallback
                         
                         # If privacy is enabled
@@ -246,7 +247,7 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
                     # Unknown format, store as is
                     birthday = bday_value
             except Exception as e:
-                print(f"Error parsing birthday: {e}")
+                logger.error(f"Error parsing birthday: {e}")
         
         # Extract notes
         notes = None
@@ -301,11 +302,11 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
         )
     
     except Exception as e:
-        print(f"Error parsing vCard: {e}")
-        print(f"Contact UID: {uid if 'uid' in locals() else 'Unknown'}")
-        print(f"Contact full_name: {full_name if 'full_name' in locals() else 'Unknown'}")
-        print(f"vCard href: {href}")
-        print(f"vCard data (first 500 chars): {vcard_data[:500] if vcard_data else 'None'}")
+        logger.error(f"Error parsing vCard: {e}")
+        logger.error(f"Contact UID: {uid if 'uid' in locals() else 'Unknown'}")
+        logger.error(f"Contact full_name: {full_name if 'full_name' in locals() else 'Unknown'}")
+        logger.error(f"vCard href: {href}")
+        logger.error(f"vCard data (first 500 chars): {vcard_data[:500] if vcard_data else 'None'}")
         return None
 
 

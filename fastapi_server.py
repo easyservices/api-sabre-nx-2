@@ -53,6 +53,7 @@ from src.common.add_proxy import CustomProxyHeadersMiddleware
 from src.common.sec import authenticate_with_nextcloud
 from src.common import security
 from fastapi_pagination import add_pagination
+from src import logger
 
 # Load configuration
 fastapi_config = load_fastapi_config()
@@ -121,14 +122,14 @@ async def get_documentation(username: str = Depends(validate_api_key)):
 async def openapi(username: str = Depends(validate_api_key)):
     return get_openapi(title = "FastAPI", version="0.1.0", routes=app.routes)
 """
-
+logger.info(f"Starting {fastapi_config['fastapi']['title']} v{fastapi_config['fastapi']['version']}")
+logger.info(f"API documentation available at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/docs")
+logger.info(f"ReDoc documentation available at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/redoc")
+logger.info(f"Server status at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/status")
 
 # Run the server directly with uvicorn when this script is executed
 if __name__ == "__main__":
-    print(f"Starting {fastapi_config['fastapi']['title']} v{fastapi_config['fastapi']['version']}")
-    print(f"API documentation available at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/docs")
-    print(f"ReDoc documentation available at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/redoc")
-    print(f"Server status at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/status")
+    # Start the FastAPI server with Uvicorn
     uvicorn.run(
         "fastapi_server:app",  # Path to the FastAPI app object (filename:variable_name)
         reload=fastapi_config['fastapi']['reload'],             # Enable auto-reload for development

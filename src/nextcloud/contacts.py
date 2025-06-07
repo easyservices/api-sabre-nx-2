@@ -74,8 +74,7 @@ from src.nextcloud.libs.carddav_helpers import (
     contact_to_vcard,
     create_vcard_headers
 )
-
-IS_DEBUG = False  # Set to True for debugging - be aware of sensitive data in logs
+from src import logger
 
 
 async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: Optional[str] = None, privacy: Optional[bool] = False) -> List[Contact]:
@@ -108,21 +107,17 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
     Raises:
         HTTPException: For authentication, authorization, server, or parsing errors.
     """
-    if IS_DEBUG:
-        print(f"get_all_contacts: credentials: {credentials}")
+    logger.debug(f"get_all_contacts: retrieving all contacts with privacy mode: {privacy}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"get_all_contacts: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
-    if IS_DEBUG:
-        print(f"get_all_contacts: carddav_url: {carddav_url}")
+    logger.debug(f"get_all_contacts: carddav_url: {carddav_url}")
 
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     headers = create_request_headers(auth_header)
-    if IS_DEBUG:
-        print(f"get_all_contacts: headers: {headers}")
+    logger.debug(f"get_all_contacts: headers: {headers}")
 
     xml_data = create_request_xml()
     
@@ -146,11 +141,11 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
                         if contact:
                             contacts.append(contact)
                         else:
-                            print(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
+                            logger.error(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
                     except Exception as e:
-                        print(f"Error parsing contact #{i+1}: {e}")
-                        print(f"Contact href: {item.get('href', 'Unknown')}")
-                        print(f"vCard data (first 200 chars): {item.get('vcard_data', '')[:200]}")
+                        logger.error(f"Error parsing contact #{i+1}: {e}")
+                        logger.error(f"Contact href: {item.get('href', 'Unknown')}")
+                        logger.error(f"vCard data (first 200 chars): {item.get('vcard_data', '')[:200]}")
                         # Continue processing other contacts instead of failing completely
                         continue
                 
@@ -186,16 +181,13 @@ async def search_contacts(
     Raises:
         HTTPException: For authentication, authorization, server, or parsing errors.
     """
-    if IS_DEBUG:
-        print(f"search_contacts: credentials: {credentials}")
+    logger.debug(f"search_contacts: searching contacts with criteria: {search_criteria} with privacy mode: {privacy}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"search_contacts: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
-    if IS_DEBUG:
-        print(f"search_contacts: carddav_url: {carddav_url}")
+    logger.debug(f"search_contacts: carddav_url: {carddav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Extract search_type from the criteria
@@ -231,11 +223,11 @@ async def search_contacts(
                         if contact:
                             contacts.append(contact)
                         else:
-                            print(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
+                            logger.error(f"Warning: Failed to parse contact #{i+1} at href: {item.get('href', 'Unknown')}")
                     except Exception as e:
-                        print(f"Error parsing contact #{i+1}: {e}")
-                        print(f"Contact href: {item.get('href', 'Unknown')}")
-                        print(f"vCard data (first 200 chars): {item.get('vCard_data', '')[:200]}")
+                        logger.error(f"Error parsing contact #{i+1}: {e}")
+                        logger.error(f"Contact href: {item.get('href', 'Unknown')}")
+                        logger.error(f"vCard data (first 200 chars): {item.get('vCard_data', '')[:200]}")
                         # Continue processing other contacts instead of failing completely
                         continue
                 
@@ -266,12 +258,10 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     Raises:
         HTTPException: For authentication, authorization, server, or parsing errors.
     """
-    if IS_DEBUG:
-        print(f"create_contact: credentials: {credentials}")
+    logger.debug(f"create_contact: received contact to create: {contact}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"create_contact: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     # Ensure the contact has a UID
     if not contact.uid:
@@ -284,8 +274,7 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     
     # Ensure the carddav_url ends with a slash
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
-    if IS_DEBUG:
-        print(f"create_contact: carddav_url: {carddav_url}")
+    logger.debug(f"create_contact: carddav_url: {carddav_url}")
     base_url = carddav_url if carddav_url.endswith('/') else f"{carddav_url}/"
     
     # Create the contact filename with the UID
@@ -297,8 +286,7 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     # Update the contact's vcs_uri with the URL where it will be created
     contact.vcs_uri = contact_url
 
-    if IS_DEBUG:
-        print(f"Creating contact at URL: {contact_url}")
+    logger.debug(f"Creating contact at URL: {contact_url}")
     
     # Generate the vCard data with the updated vcs_uri
     vcard_data = contact_to_vcard(contact)
@@ -354,16 +342,13 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
         HTTPException: For authentication, authorization, server, or parsing errors.
         ValueError: If the contact doesn't have a UID.
     """
-    if IS_DEBUG:
-        print(f"update_contact: credentials: {credentials}")
+    logger.debug(f"update_contact: updating contact with UID: {contact.uid}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"update_contact: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
-    if IS_DEBUG:
-        print(f"update_contact: carddav_url: {carddav_url}")
+    logger.debug(f"update_contact: carddav_url: {carddav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Ensure the contact has a UID
@@ -383,8 +368,7 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
         # Update the contact's vcs_uri if it wasn't already set
         contact.vcs_uri = contact_url
 
-    if IS_DEBUG:
-        print(f"updating contact at URL: {contact_url}")
+    logger.debug(f"updating contact at URL: {contact_url}")
     
     # Generate the vCard data with the updated vcs_uri
     vcard_data = contact_to_vcard(contact)
@@ -438,16 +422,13 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressboo
         HTTPException: For authentication, authorization, server, or parsing errors.
         ValueError: If the uid is empty or None.
     """
-    if IS_DEBUG:
-        print(f"delete_contact: credentials: {credentials}")
+    logger.debug(f"delete_contact: deleting contact with UID: {uid}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"delete_contact: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
-    if IS_DEBUG:
-        print(f"delete_contact: carddav_url: {carddav_url}")
+    logger.debug(f"delete_contact: carddav_url: {carddav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Validate the UID
@@ -459,8 +440,7 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressboo
     contact_filename = f"{uid}.vcf"
     contact_url = f"{base_url}{contact_filename}"
     
-    if IS_DEBUG:
-        print(f"Deleting contact at URL: {contact_url}")
+    logger.debug(f"Deleting contact at URL: {contact_url}")
     
     # Create headers for the DELETE request
     headers = {
@@ -515,16 +495,13 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addres
         HTTPException: For authentication, authorization, server, or parsing errors.
         ValueError: If the uid is empty or None.
     """
-    if IS_DEBUG:
-        print(f"get_contact_by_uid: credentials: {credentials}")
+    logger.debug(f"get_contact_by_uid: retrieving contact with UID: {uid} with privacy mode: {privacy}")
         
     user_info = authenticate_with_nextcloud(credentials)
-    if IS_DEBUG:
-        print(f"get_contact_by_uid: User info: {user_info}")
+    logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
-    if IS_DEBUG:
-        print(f"get_contact_by_uid: carddav_url: {carddav_url}")
+    logger.debug(f"get_contact_by_uid: carddav_url: {carddav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
     # Validate the UID
@@ -536,8 +513,7 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addres
     contact_filename = f"{uid}.vcf"
     contact_url = f"{base_url}{contact_filename}"
     
-    if IS_DEBUG:
-        print(f"Retrieving contact at URL: {contact_url}")
+    logger.debug(f"Retrieving contact at URL: {contact_url}")
     
     # Create headers for the GET request
     headers = {

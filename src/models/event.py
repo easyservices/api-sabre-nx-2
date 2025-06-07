@@ -20,6 +20,7 @@ from typing import List, Optional, Literal, Union
 import uuid
 from datetime import datetime
 from pydantic import BaseModel, Field
+from src import logger
 
 class Attendee(BaseModel):
     """
