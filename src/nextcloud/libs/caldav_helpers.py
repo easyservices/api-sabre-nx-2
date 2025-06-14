@@ -51,9 +51,22 @@ def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] 
                     if component.get("CATEGORIES"):
                         cat_data = component.get("CATEGORIES", [])
                         if isinstance(cat_data, list):
-                            categories = [str(cat) for cat in cat_data]
+                            # Handle multiple category objects
+                            for cat in cat_data:
+                                if hasattr(cat, 'cats'):
+                                    # icalendar.prop.vCategory has a 'cats' attribute containing the actual values
+                                    categories.extend([str(c) for c in cat.cats])
+                                else:
+                                    # Fallback to string conversion
+                                    categories.append(str(cat))
                         else:
-                            categories = [str(cat_data)]
+                            # Handle single category object
+                            if hasattr(cat_data, 'cats'):
+                                # icalendar.prop.vCategory has a 'cats' attribute containing the actual values
+                                categories.extend([str(c) for c in cat_data.cats])
+                            else:
+                                # Fallback to string conversion
+                                categories.append(str(cat_data))
 
                     # Handle privacy setting
                     description = str(component.get("DESCRIPTION", "")) if component.get("DESCRIPTION") else None
