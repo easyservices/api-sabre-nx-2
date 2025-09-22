@@ -41,16 +41,13 @@ Run this file directly to start the development server, or deploy using
 a production WSGI server like Gunicorn or Uvicorn for production environments.
 """
 
-from fastapi import Depends, FastAPI
-from fastapi.security import HTTPBasicCredentials
+from fastapi import FastAPI
 from src.api import contacts, events, utils
 from src.api import load_config as load_fastapi_config
 import uvicorn
 from starlette.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from src.common.add_proxy import CustomProxyHeadersMiddleware
-from src.common.sec import authenticate_with_nextcloud
-from src.common import security
 from fastapi_pagination import add_pagination
 from src import logger
 
@@ -110,17 +107,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 #    return RedirectResponse(url="/docs")
 
     
-# deactivate this to disable the API key validation for these endpoints
-"""
-@app.get("/docs")
-async def get_documentation(username: str = Depends(validate_api_key)):
-    return get_swagger_ui_html(openapi_url="/openapi.json", title="docs")
-
-
-@app.get("/openapi.json")
-async def openapi(username: str = Depends(validate_api_key)):
-    return get_openapi(title = "FastAPI", version="0.1.0", routes=app.routes)
-"""
 logger.info(f"Starting {fastapi_config['fastapi']['title']} v{fastapi_config['fastapi']['version']}")
 logger.info(f"API documentation available at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/docs")
 logger.info(f"ReDoc documentation available at http://{fastapi_config['fastapi']['host']}:{fastapi_config['fastapi']['port']}/redoc")
