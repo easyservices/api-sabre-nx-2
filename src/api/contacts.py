@@ -121,6 +121,10 @@ async def create_contact_endpoint(
         
         return created_contact
         
+    except HTTPException as exc:
+        res_txt = f"Could not create contact: {exc.detail if hasattr(exc, 'detail') else str(exc)}"
+        logger.error(res_txt)
+        raise
     except Exception as e:
         res_txt = f"Could not create contact: {str(e)}"
         logger.error(res_txt)
@@ -259,6 +263,10 @@ async def read_contact_endpoint(
         res_txt = f"ValueError: {str(e)}"
         logger.error(res_txt)
         raise HTTPException(status_code=400, detail=res_txt)
+    except HTTPException as exc:
+        res_txt = f"Could not retrieve contact: {exc.detail if hasattr(exc, 'detail') else str(exc)}"
+        logger.error(res_txt)
+        raise
     except Exception as e:
         res_txt = f"Could not retrieve contact: {str(e)}"
         logger.error(res_txt)
@@ -399,6 +407,10 @@ async def update_contact_endpoint(
         logger.error(res_txt)
         # Handle validation errors
         raise HTTPException(status_code=400, detail=res_txt)
+    except HTTPException as exc:
+        res_txt = f"Could not update contact: {exc.detail if hasattr(exc, 'detail') else str(exc)}"
+        logger.error(res_txt)
+        raise
     except Exception as e:
         res_txt = f"Could not update contact: {str(e)}"
         logger.error(res_txt)
@@ -518,6 +530,10 @@ async def delete_contact_endpoint(
         logger.error(res_txt)
         # Handle validation errors
         raise HTTPException(status_code=400, detail=res_txt)
+    except HTTPException as exc:
+        res_txt = f"Could not delete contact: {exc.detail if hasattr(exc, 'detail') else str(exc)}"
+        logger.error(res_txt)
+        raise
     except Exception as e:
         res_txt = f"Could not delete contact: {str(e)}"
         logger.error(res_txt)
@@ -631,6 +647,10 @@ async def get_all_contacts_endpoint(
             credentials=credentials,
             privacy=privacy
         )
+    except HTTPException as exc:
+        res_txt = f"Could not get all contacts: {exc.detail if hasattr(exc, 'detail') else str(exc)}"
+        logger.error(res_txt)
+        raise
     except Exception as e:
         # Handle potential errors during the fetch from Nextcloud
         res_txt = f"Could not get all contacts: {str(e)}"
@@ -766,6 +786,10 @@ async def search_contacts_endpoint(
             search_criteria=search_criteria,
             privacy=privacy
         )
+    except HTTPException as exc:
+        res_txt = f"Could not search contacts: {exc.detail if hasattr(exc, 'detail') else str(exc)}"
+        logger.error(res_txt)
+        raise
     except Exception as e:
         res_txt = f"Could not search contacts: {str(e)}"
         logger.error(res_txt)

@@ -61,7 +61,7 @@ pip install -r requirements.txt
 
 ## Configuration
 
-The application requires configuration to connect to your Nextcloud instance. Look at the config.example.yaml file in the /src/mcp, /src/api and /src/nexcloud directories. Rename them in config.yaml and edit them according to your needs.
+The application requires configuration to connect to your Nextcloud instance. Look at the config.example.yaml file in the /src/mcp, /src/api and /src/nextcloud directories. Rename them in config.yaml and edit them according to your needs.
 
 ## Usage
 
