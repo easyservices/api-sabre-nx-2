@@ -1,3 +1,9 @@
+"""Legacy MCP integration retained for agent compatibility.
+
+The API-only deployment does not require this module, but it remains available
+for environments that still rely on FastMCP tooling.
+"""
+
 from fastmcp import FastMCP
 import yaml
 import os

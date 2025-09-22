@@ -4,36 +4,14 @@ Copyright (c) 2025 harokku999@gmail.com
 Licensed under the MIT License - https://opensource.org/licenses/MIT
 -->
 
-## 🔗 Seamless Integration with Nextcloud through REST/JSON APIs
+## 🔗 REST/JSON APIs for Nextcloud
 
-Our custom-developed solution exposes Nextcloud’s CalDAV and CardDAV interfaces as modern, developer-friendly REST/JSON APIs, enabling seamless integration with virtually any application, regardless of platform or language.
-
-No more dealing with legacy protocols — developers can now access, create, or update calendar events and contact records using simple HTTP requests and standard JSON payloads.
-
-But that's not all.
-
-This platform will also support MCP (Message-Centric Protocol), making it natively compatible with intelligent agents and AI-driven automation tools. Real-time updates, continuous event streams, and smart synchronization capabilities are now at your fingertips.
-⚙️ Key Benefits:
-
-    📅 REST access to CalDAV: Read, create, update calendar events easily.
-
-    👥 REST access to CardDAV: Manage contacts in a fully interoperable way.
-
-    ⚡ AI/Agent-ready: HTTP Stream-based support for live data streams via MCP.
-
-    🔗 Easy integration: Works with any REST-capable system (CRMs, ERPs, bots...).
-
-    🔐 Secure and efficient: Built on top of Nextcloud’s robust auth and permission system.
-
-🚀 Empower your ecosystem
-
-Whether you're developing business automation workflows, personal productivity tools, or AI assistants, this REST/JSON bridge opens up Nextcloud to a whole new world of integrations.
+This project exposes Nextcloud’s CalDAV and CardDAV interfaces as modern, developer-friendly REST/JSON APIs. Use simple HTTP requests and JSON payloads to read, create, update, or delete calendar events and contact records without dealing with legacy WebDAV protocols directly.
 
 ## Features
 
 - REST API for contacts and events management
 - Comprehensive CardDAV/CalDAV integration with Nextcloud
-- Model Context Protocol (MCP) server implementation
 - Secure authentication handling
 - Comprehensive test coverage
 - Swagger UI documentation
@@ -61,7 +39,12 @@ pip install -r requirements.txt
 
 ## Configuration
 
-The application requires configuration to connect to your Nextcloud instance. Look at the config.example.yaml file in the /src/mcp, /src/api and /src/nextcloud directories. Rename them in config.yaml and edit them according to your needs.
+The application requires configuration to connect to your Nextcloud instance. Copy the example YAML files and adjust them for your environment:
+
+- `src/api/config.example.yaml` → `src/api/config.yaml`
+- `src/nextcloud/config.example.yaml` → `src/nextcloud/config.yaml`
+
+Update these files with the details for your deployment (service metadata, host/port, and Nextcloud connection settings) before starting the API server.
 
 ## Usage
 
