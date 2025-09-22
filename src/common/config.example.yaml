@@ -2,6 +2,6 @@
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 
 users:
-  testme4nx:
-    NEXTCLOUD_USERNAME: "testme4nx"
-    NEXTCLOUD_PASSWORD: "1sfsfALKIOUtfdcvbklMIKOPOYOT!:;,"
+  test4me:
+    NEXTCLOUD_USERNAME: "test4me"
+    NEXTCLOUD_PASSWORD: "replace-with-real-password"
