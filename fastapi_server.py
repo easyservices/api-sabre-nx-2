@@ -42,7 +42,6 @@ a production WSGI server like Gunicorn or Uvicorn for production environments.
 """
 
 from fastapi import Depends, FastAPI
-from fastmcp import FastMCP
 from fastapi.security import HTTPBasicCredentials
 from src.api import contacts, events, utils
 from src.api import load_config as load_fastapi_config
