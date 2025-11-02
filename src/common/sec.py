@@ -75,7 +75,7 @@ def authenticate_with_nextcloud(credentials: HTTPBasicCredentials):
     **Security Considerations:**
     - Credentials are validated against live Nextcloud user database
     - No local password storage or validation
-    - Cache keys include password hash for security
+    - Cache keys use the raw username and password combination stored only in-memory
     - Proper HTTP status codes for different failure scenarios
     
     Args:
