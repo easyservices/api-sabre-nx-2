@@ -10,16 +10,11 @@ Our custom-developed solution exposes Nextcloud’s CalDAV and CardDAV interface
 
 No more dealing with legacy protocols — developers can now access, create, or update calendar events and contact records using simple HTTP requests and standard JSON payloads.
 
-But that's not all.
-
-This platform will also support MCP (Message-Centric Protocol), making it natively compatible with intelligent agents and AI-driven automation tools. Real-time updates, continuous event streams, and smart synchronization capabilities are now at your fingertips.
 ⚙️ Key Benefits:
 
     📅 REST access to CalDAV: Read, create, update calendar events easily.
 
     👥 REST access to CardDAV: Manage contacts in a fully interoperable way.
-
-    ⚡ AI/Agent-ready: HTTP Stream-based support for live data streams via MCP.
 
     🔗 Easy integration: Works with any REST-capable system (CRMs, ERPs, bots...).
 
@@ -33,7 +28,6 @@ Whether you're developing business automation workflows, personal productivity t
 
 - REST API for contacts and events management
 - Comprehensive CardDAV/CalDAV integration with Nextcloud
-- Model Context Protocol (MCP) server implementation
 - Secure authentication handling
 - Comprehensive test coverage
 - Swagger UI documentation
@@ -61,7 +55,7 @@ pip install -r requirements.txt
 
 ## Configuration
 
-The application requires configuration to connect to your Nextcloud instance. Look at the config.example.yaml file in the /src/mcp, /src/api and /src/nexcloud directories. Rename them in config.yaml and edit them according to your needs.
+The application requires configuration to connect to your Nextcloud instance. Look at the config.example.yaml file in the /src/mcp, /src/api and /src/nextcloud directories. Rename them in config.yaml and edit them according to your needs.
 
 ## Usage
 
@@ -107,11 +101,7 @@ python -m tests.test_events_api_cli
 ```
 
 ## Contributing
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes (`git commit -am 'Add some feature'`)
-4. Push to the branch (`git push origin feature/your-feature`)
-5. Create new Merge Request
+Let me know if you want to participate and how!
 
 ## License
 **License**: [MIT](https://choosealicense.com/licenses/mit/)

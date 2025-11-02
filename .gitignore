@@ -20,6 +20,7 @@ env/
 .idea/
 *.swp
 *.swo
+.roo/
 
 # OS
 .DS_Store
@@ -28,6 +29,4 @@ env/
 src/common/config.yaml
 src/nextcloud/config.yaml
 src/api/config.yaml
-src/mcp/config.yaml
 fastapi_server.service
-fastmcp_server.service

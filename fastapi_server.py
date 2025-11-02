@@ -42,7 +42,6 @@ a production WSGI server like Gunicorn or Uvicorn for production environments.
 """
 
 from fastapi import Depends, FastAPI
-from fastmcp import FastMCP
 from fastapi.security import HTTPBasicCredentials
 from src.api import contacts, events, utils
 from src.api import load_config as load_fastapi_config
@@ -102,7 +101,7 @@ app.include_router(
 )
 
 # Mount static files directory for serving frontend assets
-app.mount("/static", StaticFiles(directory="static"), name="static")
+#app.mount("/static", StaticFiles(directory="static"), name="static")
 
 #@app.get("/")
 #async def read_root_endpoint():
