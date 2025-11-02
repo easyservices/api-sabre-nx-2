@@ -29,4 +29,4 @@ env/
 src/common/config.yaml
 src/nextcloud/config.yaml
 src/api/config.yaml
-fastapi_server.service
+fastapi4nx.service

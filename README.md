@@ -50,7 +50,7 @@ Update these files with the details for your deployment (service metadata, host/
 
 Run directly using the script:
 ```bash
-python fastapi_server.py
+python fastapi4nx.py
 ```
 
 The server will be available at `http://localhost:<your port>` with the following endpoints:
