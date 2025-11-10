@@ -130,7 +130,7 @@ logger.info(f"Server status at http://{fastapi_config['fastapi']['host']}:{fasta
 if __name__ == "__main__":
     # Start the FastAPI server with Uvicorn
     uvicorn.run(
-        "fastapi_server:app",  # Path to the FastAPI app object (filename:variable_name)
+        "fastapi4nx:app",  # Path to the FastAPI app object (filename:variable_name)
         reload=fastapi_config['fastapi']['reload'],             # Enable auto-reload for development
         port=fastapi_config['fastapi']['port'],                 # Port to listen on
         host=fastapi_config['fastapi']['host'],                 # Host to bind to (0.0.0.0 for all interfaces)
