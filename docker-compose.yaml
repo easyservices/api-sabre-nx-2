@@ -1,0 +1,10 @@
+services:
+  fastapi:
+    build: .
+    container_name: fastapi4nx
+    env_file:
+      - .env
+    ports:
+      - "${FASTAPI_PORT:-1265}:${FASTAPI_PORT:-1265}"
+#    volumes:
+#      - .:/app  # optional for live reload during dev

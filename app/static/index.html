@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<!--
+Copyright (c) 2025 harokku999@gmail.com
+Licensed under the MIT License - https://opensource.org/licenses/MIT
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nextcloud FastAPI - API Documentation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: #0082c9;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin: 0;
+        }
+        h2 {
+            color: #0082c9;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+        .description {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #0082c9;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #0082c9;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+        .btn:hover {
+            background-color: #006aa3;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .endpoint {
+            margin-bottom: 15px;
+        }
+        .method {
+            font-weight: bold;
+            color: #0082c9;
+        }
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #777;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Nextcloud FastAPI</h1>
+        <p>A RESTful API for Nextcloud contacts and events management</p>
+    </header>
+
+    <div class="description">
+        <p>This FastAPI application provides a RESTful API for managing Nextcloud contacts and events using CardDAV and CalDAV protocols. It includes comprehensive endpoints for creating, reading, updating, and deleting contacts and events in your Nextcloud instance.</p>
+    </div>
+
+    <div class="card">
+        <h3>API Documentation</h3>
+        <p>Explore the API using our interactive documentation:</p>
+        <a href="/docs" class="btn">Swagger UI</a>
+        <a href="/redoc" class="btn">ReDoc</a>
+        <a href="/API.md" class="btn">Markdown Documentation</a>
+    </div>
+
+    <h2>Quick Start</h2>
+    <div class="card">
+        <h3>Authentication</h3>
+        <p>All API endpoints require HTTP Basic Authentication with your Nextcloud credentials.</p>
+        <pre>Authorization: Basic base64(username:password)</pre>
+    </div>
+
+    <h2>Contacts API</h2>
+    <div class="card">
+        <div class="endpoint">
+            <span class="method">GET</span> <code>/contacts/</code> - Get all contacts
+        </div>
+        <div class="endpoint">
+            <span class="method">GET</span> <code>/contacts/{uid}</code> - Get a contact by UID
+        </div>
+        <div class="endpoint">
+            <span class="method">POST</span> <code>/contacts/</code> - Create a new contact
+        </div>
+        <div class="endpoint">
+            <span class="method">PUT</span> <code>/contacts/{uid}</code> - Update an existing contact
+        </div>
+        <div class="endpoint">
+            <span class="method">DELETE</span> <code>/contacts/{uid}</code> - Delete a contact
+        </div>
+        <div class="endpoint">
+            <span class="method">POST</span> <code>/contacts/search</code> - Search for contacts
+        </div>
+    </div>
+
+    <h2>Events API</h2>
+    <div class="card">
+        <div class="endpoint">
+            <span class="method">GET</span> <code>/events/{uid}</code> - Get an event by UID
+        </div>
+        <div class="endpoint">
+            <span class="method">GET</span> <code>/events/?start_datetime={start}&end_datetime={end}</code> - Get events in a time range
+        </div>
+        <div class="endpoint">
+            <span class="method">POST</span> <code>/events/</code> - Create a new event
+        </div>
+        <div class="endpoint">
+            <span class="method">PUT</span> <code>/events/{uid}</code> - Update an existing event
+        </div>
+        <div class="endpoint">
+            <span class="method">DELETE</span> <code>/events/{uid}</code> - Delete an event
+        </div>
+    </div>
+
+    <h2>Example Usage</h2>
+    <div class="card">
+        <h3>Get All Contacts</h3>
+        <pre>curl -X GET "http://localhost:1260/contacts/" \
+    -H "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ="</pre>
+    </div>
+
+    <div class="card">
+        <h3>Create a New Event</h3>
+        <pre>curl -X POST "http://localhost:1260/events/" \
+    -H "Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "summary": "Team Meeting",
+        "description": "Weekly team sync-up",
+        "location": "Conference Room A",
+        "start": "2025-04-21T14:00:00",
+        "end": "2025-04-21T15:00:00",
+        "all_day": false,
+        "status": "CONFIRMED",
+        "categories": ["MEETING", "WORK"]
+    }'</pre>
+    </div>
+
+    <footer>
+        <p>Nextcloud FastAPI v0.1.0 | <a href="https://github.com/your-username/your-repo">GitHub Repository</a></p>
+    </footer>
+</body>
+</html>
