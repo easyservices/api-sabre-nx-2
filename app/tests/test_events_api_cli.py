@@ -46,15 +46,15 @@ def test_get_event_by_uid(event_uid=None, is_debug=False):
         print(f"Retrieving event with UID: {event_uid}")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200:
-        result = response.json()
-        if is_debug:
-            print("Event retrieved successfully:")
-            print(json.dumps(result, indent=4, sort_keys=True))
-        return result
-    else:
-        print(f"Error: {response.text}")
-        return None
+    assert response.status_code == 200, (
+        f"Expected 200 when retrieving event by UID, got {response.status_code}: {response.text}"
+    )
+
+    result = response.json()
+    if is_debug:
+        print("Event retrieved successfully:")
+        print(json.dumps(result, indent=4, sort_keys=True))
+    return result
 
 
 def test_get_events_by_time_range(start_datetime=None, end_datetime=None, is_debug=False):
@@ -87,34 +87,34 @@ def test_get_events_by_time_range(start_datetime=None, end_datetime=None, is_deb
         print(f"Retrieving events between: {start_datetime} and {end_datetime}")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200:
-        results = response.json()
-        if is_debug:
-            print(f"Retrieved {len(results)} events:")
-            
-            # Print details for up to 5 events
-            for i, event in enumerate(results[:5]):
-                print(f"\nEvent {i+1}:")
-                print(f"UID: {event.get('uid')}")
-                print(f"Summary: {event.get('summary')}")
-                print(f"Start: {event.get('start')}")
-                print(f"End: {event.get('end')}")
-                print(f"Location: {event.get('location')}")
-                
-                if event.get('attendees'):
-                    print(f"Attendees: {len(event.get('attendees'))}")
-                    for attendee in event.get('attendees')[:3]:  # Show first 3 attendees only
-                        print(f"  - {attendee.get('name') or attendee.get('email')}")
-                    if len(event.get('attendees')) > 3:
-                        print(f"  - ... and {len(event.get('attendees')) - 3} more")
-            
-            if len(results) > 5:
-                print(f"\n... and {len(results) - 5} more events")
+    assert response.status_code == 200, (
+        f"Expected 200 when retrieving events range, got {response.status_code}: {response.text}"
+    )
+
+    results = response.json()
+    if is_debug:
+        print(f"Retrieved {len(results)} events:")
         
-        return results
-    else:
-        print(f"Error: {response.text}")
-        return None
+        # Print details for up to 5 events
+        for i, event in enumerate(results[:5]):
+            print(f"\nEvent {i+1}:")
+            print(f"UID: {event.get('uid')}")
+            print(f"Summary: {event.get('summary')}")
+            print(f"Start: {event.get('start')}")
+            print(f"End: {event.get('end')}")
+            print(f"Location: {event.get('location')}")
+            
+            if event.get('attendees'):
+                print(f"Attendees: {len(event.get('attendees'))}")
+                for attendee in event.get('attendees')[:3]:  # Show first 3 attendees only
+                    print(f"  - {attendee.get('name') or attendee.get('email')}")
+                if len(event.get('attendees')) > 3:
+                    print(f"  - ... and {len(event.get('attendees')) - 3} more")
+        
+        if len(results) > 5:
+            print(f"\n... and {len(results) - 5} more events")
+    
+    return results
 
 
 def test_create_event(is_debug=False):
@@ -154,15 +154,15 @@ def test_create_event(is_debug=False):
         print(f"Creating event with summary: {event_data['summary']}")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200 or response.status_code == 201:
-        result = response.json()
-        if is_debug:
-            print("Event created successfully:")
-            print(json.dumps(result, indent=4, sort_keys=True))
-        return result
-    else:
-        print(f"Error: {response.text}")
-        return None
+    assert response.status_code in (200, 201), (
+        f"Expected 200/201 when creating event, got {response.status_code}: {response.text}"
+    )
+
+    result = response.json()
+    if is_debug:
+        print("Event created successfully:")
+        print(json.dumps(result, indent=4, sort_keys=True))
+    return result
 
 
 def test_update_event(event_uid=None, is_debug=False):
@@ -214,15 +214,15 @@ def test_update_event(event_uid=None, is_debug=False):
     if is_debug:
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200:
-        result = response.json()
-        if is_debug:
-            print("Event updated successfully:")
-            print(json.dumps(result, indent=4, sort_keys=True))
-        return result
-    else:
-        print(f"Error: {response.text}")
-        return None
+    assert response.status_code == 200, (
+        f"Expected 200 when updating event, got {response.status_code}: {response.text}"
+    )
+
+    result = response.json()
+    if is_debug:
+        print("Event updated successfully:")
+        print(json.dumps(result, indent=4, sort_keys=True))
+    return result
 
 
 def test_delete_event(event_uid=None, is_debug=False):
@@ -255,13 +255,13 @@ def test_delete_event(event_uid=None, is_debug=False):
         print(f"Status Code: {response.status_code}")
     
     # 204 No Content is the expected response for successful deletion
-    if response.status_code == 204:
-        if is_debug:
-            print("Event deleted successfully")
-        return True
-    else:
-        print(f"Error: {response.text}")
-        return None
+    assert response.status_code == 204, (
+        f"Expected 204 when deleting event, got {response.status_code}: {response.text}"
+    )
+
+    if is_debug:
+        print("Event deleted successfully")
+    return True
 
 
 # Run the tests

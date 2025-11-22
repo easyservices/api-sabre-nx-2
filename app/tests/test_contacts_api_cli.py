@@ -35,15 +35,15 @@ def test_get_all_contacts(is_debug=False):
     if is_debug:
         print("### TEST GET ALL CONTACTS ###")
         print(f"Status Code: {response.status_code}")
-    if response.status_code == 200:
-        contacts = response.json()
-        if is_debug:
-            print(f"Found {len(contacts)} contacts")
-            print(json.dumps(contacts, indent=4, sort_keys=True))
-        #assert len(contacts) > 0
-        return len(contacts)  # Return the number of contacts found
-    else:
-        print(f"Error: {response.text}")
+    assert response.status_code == 200, (
+        f"Expected 200 when listing contacts, got {response.status_code}: {response.text}"
+    )
+
+    contacts = response.json()
+    if is_debug:
+        print(f"Found {len(contacts)} contacts")
+        print(json.dumps(contacts, indent=4, sort_keys=True))
+    return len(contacts)  # Return the number of contacts found
 
 
 def test_search_contacts(is_debug=False):
@@ -78,15 +78,15 @@ def test_search_contacts(is_debug=False):
         print(f"Search criteria: {search_criteria}")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200:
-        contacts = response.json()
-        if is_debug:
-            print(f"Found {len(contacts)} matching contacts")
-            print(json.dumps(contacts, indent=4, sort_keys=True))
-        #assert len(contacts) > 0
-        return len(contacts)  # Return the number of contacts found
-    else:
-        print(f"Error: {response.text}")
+    assert response.status_code == 200, (
+        f"Expected 200 when searching contacts, got {response.status_code}: {response.text}"
+    )
+
+    contacts = response.json()
+    if is_debug:
+        print(f"Found {len(contacts)} matching contacts")
+        print(json.dumps(contacts, indent=4, sort_keys=True))
+    return len(contacts)  # Return the number of contacts found
 
 
 def test_create_contact(is_debug=False):
@@ -141,18 +141,16 @@ def test_create_contact(is_debug=False):
         print("\n### TEST CREATE CONTACT ###")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200:
-        created_contact = response.json()
-        if is_debug:
-            print("Contact created successfully:")
-            print(json.dumps(created_contact, indent=4, sort_keys=True))
-        
-        # Return the created contact for use in update test
-        #assert created_contact is not None
-        return created_contact
-    else:
-        print(f"Error: {response.text}")
-        return None
+    assert response.status_code in (200, 201), (
+        f"Expected 200/201 when creating contact, got {response.status_code}: {response.text}"
+    )
+
+    created_contact = response.json()
+    if is_debug:
+        print("Contact created successfully:")
+        print(json.dumps(created_contact, indent=4, sort_keys=True))
+    
+    return created_contact
 
 
 def test_update_contact(contact=None, is_debug=False):
@@ -196,16 +194,17 @@ def test_update_contact(contact=None, is_debug=False):
         print("\n### TEST UPDATE CONTACT ###")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200:
-        result = response.json()
-        if is_debug:
-            print("Contact updated successfully:")
-            print(f"Original name: {original_name}")
-            print(f"Updated name: {result.get('full_name')}")
-            print(json.dumps(result, indent=4, sort_keys=True))
-        return result
-    else:
-        print(f"Error: {response.text}")
+    assert response.status_code == 200, (
+        f"Expected 200 when updating contact, got {response.status_code}: {response.text}"
+    )
+
+    result = response.json()
+    if is_debug:
+        print("Contact updated successfully:")
+        print(f"Original name: {original_name}")
+        print(f"Updated name: {result.get('full_name')}")
+        print(json.dumps(result, indent=4, sort_keys=True))
+    return result
 
 
 def test_delete_contact(contact=None, is_debug=False):
@@ -240,14 +239,13 @@ def test_delete_contact(contact=None, is_debug=False):
         print("\n### TEST DELETE CONTACT ###")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 204:
+    assert response.status_code == 204, (
+        f"Expected 204 when deleting contact, got {response.status_code}: {response.text}"
+    )
 
-        if is_debug:
-            print(f"Contact deleted successfully: {contact}")
-        return contact
-    else:
-        print(f"Error: {response.text}")
-        return None
+    if is_debug:
+        print(f"Contact deleted successfully: {contact}")
+    return contact
 
 
 def test_get_contact_by_uid(contact=None, is_debug=False):
@@ -282,15 +280,15 @@ def test_get_contact_by_uid(contact=None, is_debug=False):
         print("\n### TEST GET CONTACT BY UID ###")
         print(f"Status Code: {response.status_code}")
     
-    if response.status_code == 200:
-        result = response.json()
-        if is_debug:
-            print("Contact retrieved successfully:")
-            print(json.dumps(result, indent=4, sort_keys=True))
-        return result
-    else:
-        print(f"Error: {response.text}")
-        return None
+    assert response.status_code == 200, (
+        f"Expected 200 when getting contact by UID, got {response.status_code}: {response.text}"
+    )
+
+    result = response.json()
+    if is_debug:
+        print("Contact retrieved successfully:")
+        print(json.dumps(result, indent=4, sort_keys=True))
+    return result
 
 
 # Run the tests

@@ -6,96 +6,119 @@ Licensed under the MIT License - https://opensource.org/licenses/MIT
 
 ## 🔗 REST/JSON APIs for Nextcloud
 
-This project exposes Nextcloud’s CalDAV and CardDAV interfaces as modern, developer-friendly REST/JSON APIs. Use simple HTTP requests and JSON payloads to read, create, update, or delete calendar events and contact records without dealing with legacy WebDAV protocols directly.
+This service wraps Nextcloud CardDAV and CalDAV endpoints with modern REST/JSON APIs so that automations, dashboards, and other services can manage contacts and calendar events without wrestling with WebDAV. It ships with both local Python tooling and a Docker workflow so you can choose the runtime that best fits your environment.
 
 ## Features
 
-- REST API for contacts and events management
-- Comprehensive CardDAV/CalDAV integration with Nextcloud
-- Secure authentication handling
-- Comprehensive test coverage
-- Swagger UI documentation
+- CRUD APIs for contacts and events backed by Nextcloud
+- Native CardDAV/CalDAV integration with optional field masking
+- HTTP Basic auth enforced at the API layer
+- OpenAPI/Swagger UI served directly by FastAPI
+- Comprehensive pytest suite covering API and CLI entry points
 
-## Roadmap
+---
 
-- [DONE] Version 0.2.0 : Refactoring to be fully docker-ized
+## Prerequisites
 
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://gitlab.com/your-username/your-repo.git
-cd your-repo
-```
-
-2. Create virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/MacOS
-# or
-.\venv\Scripts\activate  # Windows
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+- Python 3.12+
+- Docker / Docker Compose (optional but recommended for deployment)
+- Access to a Nextcloud instance with CardDAV/CalDAV enabled
 
 ## Configuration
 
-The application requires configuration to connect to your Nextcloud instance. Copy the example YAML files and adjust them for your environment:
+Copy and edit the example configuration files so the API knows how to reach your Nextcloud instance:
 
-- `src/api/config.example.yaml` → `src/api/config.yaml`
-- `src/nextcloud/config.example.yaml` → `src/nextcloud/config.yaml`
+- `app/src/api/config.example.yaml` → `app/src/api/config.yaml`
+- `app/src/nextcloud/config.example.yaml` → `app/src/nextcloud/config.yaml`
 
-Update these files with the details for your deployment (service metadata, host/port, and Nextcloud connection settings) before starting the API server.
+Populate metadata (service name, bind host/port) plus the credentials or tokens needed to connect to Nextcloud. Docker users should also create a `.env` file in the repo root and set `FASTAPI_PORT=<port>` to control how the container exposes the service.
 
-## Usage
+---
 
-Run directly using the script:
+## Running the API
+
+### Option A — Local Python
 ```bash
-python fastapi4nx.py
+git clone https://gitlab.com/your-username/your-repo.git
+cd your-repo
+python -m venv .venv
+source .venv/bin/activate   # or .venv\Scripts\activate on Windows
+pip install -r requirements.txt
+
+# After configuring the YAML files mentioned above:
+python -m app.fastapi4nx
 ```
 
-The server will be available at `http://localhost:<your port>` with the following endpoints:
-- API Documentation: `http://localhost:<your port>/docs`
-- Contacts API: `http://localhost:<your port>/contacts`
-- Events API: `http://localhost:<your port>/events`
-- Status: `http://localhost:<your port>/status`
+The server defaults to `http://localhost:1265` (override in config). Useful endpoints:
 
-## API Documentation
+- Docs/UI: `http://localhost:<port>/docs`
+- Contacts API: `http://localhost:<port>/contacts`
+- Events API: `http://localhost:<port>/events`
+- Status probe: `http://localhost:<port>/status`
 
-The API provides comprehensive endpoints for managing contacts and events in Nextcloud.
+### Option B — Docker / Docker Compose
+
+#### Compose (recommended)
+```bash
+FASTAPI_PORT=1265 docker compose up --build
+```
+`docker-compose.yaml` builds the image, loads environment variables from `.env`, and maps `<FASTAPI_PORT>` automatically.
+
+#### Manual docker build/run
+```bash
+docker build -t fastapi4nx .
+docker run --rm -p 1265:1265 --env-file .env fastapi4nx
+```
+
+The provided `Dockerfile` sets `PYTHONPATH=/app/app` and runs `python -m app.fastapi4nx` so the same configuration files are honored inside the container.
+
+---
+
+## API Highlights
+
+### Events API
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/events/{uid}` | Fetch one event; supports optional masking for private data |
+| `GET` | `/events` | List events in a time range, sorted chronologically |
+| `POST` | `/events` | Create a new event (UID auto-generated if not supplied) |
+| `PUT` | `/events/{uid}` | Update an existing event |
+| `DELETE` | `/events/{uid}` | Delete an event permanently |
+
+Common query parameters:
+- `calendar_name` – target a specific Nextcloud calendar (defaults to `personal`).
+- `privacy` – when `true`, masks sensitive fields on read operations.
+
+Example:
+```bash
+curl -u alice:secret \
+  "http://localhost:1265/events?start_datetime=2025-04-21T00:00:00&end_datetime=2025-04-28T23:59:59&privacy=true"
+```
+
+The contacts API follows the same REST conventions for managing CardDAV-backed contact records.
 
 ### Authentication
 
-All API endpoints require HTTP Basic Authentication with your Nextcloud credentials.
+All endpoints require HTTP Basic Authentication using your Nextcloud credentials. Requests without valid auth receive `401 Unauthorized`.
+
+---
 
 ## Testing
-Run all tests:
+
+Run the full suite (covers CLI helpers and API flows):
 ```bash
-pytest tests/ -v
+pytest app/tests -v
 ```
 
-Or run individual test modules:
+Individual modules can be invoked similarly, e.g. `python -m app.tests.test_contacts_api_cli`.
 
-```bash
-# Test contacts directly with Nextcloud (no FastAPI server needed)
-python -m tests.test_contacts_nx_cli
-
-# Test events directly with Nextcloud (no FastAPI server needed)
-python -m tests.test_events_nx_cli
-
-# Test contacts via the FastAPI server (requires server to be running)
-python -m tests.test_contacts_api_cli
-
-# Test events via the FastAPI server (requires server to be running)
-python -m tests.test_events_api_cli
-```
+---
 
 ## Contributing
-Let me know if you want to participate and how!
+
+Bug reports, docs fixes, and feature ideas are welcome—open an issue or reach out if you’d like to collaborate.
 
 ## License
-**License**: [MIT](https://choosealicense.com/licenses/mit/)
-**Author**: harokku999@gmail.com
+
+Released under the [MIT License](https://choosealicense.com/licenses/mit/) © harokku999@gmail.com (2025).
