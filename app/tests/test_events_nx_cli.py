@@ -16,8 +16,10 @@ from src.common.config import UsersSettings # Import your config settings
 from fastapi.security import HTTPBasicCredentials
 
 # Import Event model for type checking
-from src.models.event import Event
+from src.models.event import Event, Reminder
 from datetime import datetime, timedelta
+
+TEST_TIMEZONE = "Europe/Paris"
 
 settings = UsersSettings()
 
@@ -85,6 +87,20 @@ async def create_event_test(is_debug=False):
         # Create a sample event
         now = datetime.now()
         tomorrow = now + timedelta(days=1)
+        relative_reminder = Reminder(
+            type="DISPLAY",
+            mode="relative",
+            offset="-PT5M",
+            relation="START",
+            description="Notify 5 minutes early"
+        )
+        absolute_reminder = Reminder(
+            type="EMAIL",
+            mode="absolute",
+            fire_time=(now + timedelta(minutes=30)).isoformat(),
+            description="Email reminder 30 minutes before end",
+            timezone=TEST_TIMEZONE
+        )
         
         # Create a new event with a generated UID
         event = Event(
@@ -96,7 +112,8 @@ async def create_event_test(is_debug=False):
             end=tomorrow.isoformat(),
             all_day=False,
             status="CONFIRMED",
-            categories=["TEST", "API"]
+            categories=["TEST", "API"],
+            reminders=[relative_reminder, absolute_reminder]
         )
         
         if is_debug:
@@ -123,6 +140,13 @@ async def create_event_test(is_debug=False):
             print(f"Summary: {created_event.summary}")
             print(f"URL: {created_event.url}")
             print("-------------")
+        assert created_event.reminders, "Expected reminders to be returned when creating event"
+        for reminder in created_event.reminders:
+            assert reminder.mode in ("absolute", "relative"), "Reminder mode missing after creation"
+        assert any(
+            reminder.mode == "absolute" and reminder.timezone == TEST_TIMEZONE
+            for reminder in created_event.reminders
+        ), "Expected absolute reminder timezone to round-trip"
         
         return created_event
         

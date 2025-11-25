@@ -19,7 +19,8 @@ The module includes:
 from typing import List, Optional, Literal, Union
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from src.reminders.utils import normalize_reminder_input
 from src import logger
 
 class Attendee(BaseModel):
@@ -38,11 +39,61 @@ class Reminder(BaseModel):
     """
     Reminder/alarm information for an event.
     
-    Defines when and how a reminder should be triggered for an event.
+    Defines when and how a reminder should be triggered for an event, including
+    optional timezone metadata for absolute alarms.
     """
     type: str = Field(..., description="Type of reminder (e.g., 'DISPLAY', 'EMAIL', 'AUDIO')")
-    trigger: str = Field(..., description="When the reminder should trigger (e.g., '-PT15M' for 15 minutes before)")
+    mode: Literal["absolute", "relative"] = Field(
+        ...,
+        description="Trigger definition mode. 'absolute' uses a concrete fire time, 'relative' uses an offset"
+    )
+    fire_time: Optional[str] = Field(
+        None,
+        description="Absolute ISO timestamp when the reminder fires (required when mode='absolute')"
+    )
+    offset: Optional[str] = Field(
+        None,
+        description="ISO8601 duration offset relative to the event start/end (required when mode='relative')"
+    )
+    relation: Optional[Literal["START", "END"]] = Field(
+        "START",
+        description="Reference point for relative reminders (START or END). Ignored for absolute reminders"
+    )
+    timezone: Optional[str] = Field(
+        None,
+        description="IANA timezone identifier used when interpreting absolute triggers"
+    )
     description: Optional[str] = Field(None, description="Description or message for the reminder")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_fields(cls, data):
+        """
+        Normalize reminder payloads so both legacy and structured formats are accepted.
+        """
+        if not isinstance(data, dict):
+            return data
+        return normalize_reminder_input(data)
+
+    @model_validator(mode="after")
+    def validate_trigger_definition(self):
+        """
+        Ensure reminder trigger data is consistent with the selected mode.
+        """
+        if self.mode == "absolute":
+            if not self.fire_time:
+                raise ValueError("fire_time is required when reminder.mode='absolute'")
+            # Absolute reminders are not tied to START/END semantics
+            self.relation = None
+            self.offset = None
+        elif self.mode == "relative":
+            if not self.offset:
+                raise ValueError("offset is required when reminder.mode='relative'")
+            if not self.relation:
+                self.relation = "START"
+        else:
+            raise ValueError("mode must be either 'absolute' or 'relative'")
+        return self
 
 class Event(BaseModel):
     """

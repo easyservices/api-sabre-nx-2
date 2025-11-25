@@ -16,7 +16,6 @@ def _override_nextcloud_settings(config):
     nextcloud_cfg = config.setdefault("nextcloud", {})
     env_overrides = {
         "base_url": os.getenv("NEXTCLOUD_BASE_URL"),
-        "api_proxy_url": os.getenv("NEXTCLOUD_API_PROXY_URL"),
     }
 
     for key, value in env_overrides.items():

@@ -12,11 +12,19 @@ from fastapi import HTTPException
 from typing import List, Dict, Any, Optional
 import icalendar
 import xml.etree.ElementTree as ET
-from datetime import datetime, date, timedelta
+from datetime import datetime
 
 from src.models.event import Event, Attendee, Reminder
 from src.nextcloud.libs import PRIVACY_MODE_TXT
 from src.nextcloud.libs.carddav_helpers import validate_and_correct_url
+from src.common.timezones import extract_timezone_from_property
+from src.reminders.utils import (
+    build_reminder_payload,
+    decode_trigger_value,
+    extract_component_datetime,
+    get_trigger_relation,
+    reminder_to_ical_trigger,
+)
 
 def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] = False) -> Event:
     """
@@ -220,122 +228,40 @@ def parse_reminders(component) -> List[Reminder]:
     Returns:
         List[Reminder]: A list of Reminder objects containing alarm information.
     """
-    event_start = extract_component_datetime(component.get("DTSTART"))
-    event_end = extract_component_datetime(component.get("DTEND"))
+    dtstart_prop = component.get("DTSTART")
+    dtend_prop = component.get("DTEND")
+    event_start = extract_component_datetime(dtstart_prop)
+    event_end = extract_component_datetime(dtend_prop)
+    event_start_tz = extract_timezone_from_property(dtstart_prop)
+    event_end_tz = extract_timezone_from_property(dtend_prop)
 
     reminders = []
     for alarm in component.walk("VALARM"):
         # Extract alarm properties
-        action = str(alarm.get("ACTION", ""))
+        action = str(alarm.get("ACTION", "")) if alarm.get("ACTION") else "DISPLAY"
         trigger_prop = alarm.get("TRIGGER")
         decoded_trigger = decode_trigger_value(alarm, trigger_prop)
         related = get_trigger_relation(trigger_prop)
-        trigger = format_trigger_value(decoded_trigger, related, event_start, event_end)
+        trigger_timezone = extract_timezone_from_property(trigger_prop)
+        reminder_payload = build_reminder_payload(
+            decoded_trigger,
+            related,
+            event_start,
+            event_end,
+            trigger_timezone,
+            event_start_tz,
+            event_end_tz
+        )
         description = str(alarm.get("DESCRIPTION", "")) if alarm.get("DESCRIPTION") else None
         
         # Create Reminder object
         reminder = Reminder(
             type=action,
-            trigger=trigger,
-            description=description
+            description=description,
+            **reminder_payload
         )
         reminders.append(reminder)
     return reminders
-
-def format_trigger_value(
-    trigger_value: Any,
-    related: str,
-    event_start: Optional[datetime],
-    event_end: Optional[datetime]
-) -> str:
-    """Convert iCalendar trigger values into ISO timestamps when possible."""
-    if trigger_value is None:
-        return ""
-
-    if isinstance(trigger_value, datetime):
-        return trigger_value.isoformat()
-    if isinstance(trigger_value, date):
-        return trigger_value.isoformat()
-    if isinstance(trigger_value, timedelta):
-        reference = event_start if related != "END" else event_end
-        if reference:
-            return (reference + trigger_value).isoformat()
-        return timedelta_to_iso8601(trigger_value)
-
-    # Fallback: try native serialization if available
-    try:
-        raw = trigger_value.to_ical()
-        if isinstance(raw, bytes):
-            raw = raw.decode()
-        if isinstance(raw, str):
-            return raw
-    except AttributeError:
-        pass
-
-    dt_value = getattr(trigger_value, "dt", None)
-    if dt_value is not None and dt_value is not trigger_value:
-        return format_trigger_value(dt_value, related, event_start, event_end)
-
-    return str(trigger_value)
-
-def decode_trigger_value(alarm: Any, trigger_prop: Any) -> Any:
-    """Safely decode the trigger value to native Python types."""
-    if not trigger_prop:
-        return None
-    try:
-        return alarm.decoded("TRIGGER")
-    except Exception:
-        return trigger_prop
-
-def get_trigger_relation(trigger_prop: Any) -> str:
-    """Determine whether a trigger is relative to the event START or END."""
-    if trigger_prop and hasattr(trigger_prop, "params"):
-        related = trigger_prop.params.get("RELATED")
-        if related:
-            return str(related).upper()
-    return "START"
-
-def extract_component_datetime(prop: Any) -> Optional[datetime]:
-    """Return a datetime object from an iCalendar property value."""
-    if not prop:
-        return None
-
-    candidate = getattr(prop, "dt", prop)
-    if isinstance(candidate, datetime):
-        return candidate
-    if isinstance(candidate, date):
-        return datetime.combine(candidate, datetime.min.time())
-
-    try:
-        return datetime.fromisoformat(str(candidate))
-    except (TypeError, ValueError):
-        return None
-
-def timedelta_to_iso8601(delta: timedelta) -> str:
-    """Render ``timedelta`` instances as ISO8601 duration strings."""
-    total_seconds = int(delta.total_seconds())
-    sign = "-" if total_seconds < 0 else ""
-    total_seconds = abs(total_seconds)
-
-    days, remainder = divmod(total_seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
-
-    date_part = f"{days}D" if days else ""
-
-    time_parts = []
-    if hours:
-        time_parts.append(f"{hours}H")
-    if minutes:
-        time_parts.append(f"{minutes}M")
-    if seconds:
-        time_parts.append(f"{seconds}S")
-
-    if not date_part and not time_parts:
-        time_parts.append("0S")
-
-    time_part = f"T{''.join(time_parts)}" if time_parts else ""
-    return f"{sign}P{date_part}{time_part}"
 
 def handle_caldav_response_status(status_code: int, response_text: str) -> None:
     """
@@ -568,7 +494,12 @@ def event_to_ical(event: Event) -> str:
         for reminder in event.reminders:
             valarm = icalendar.Alarm()
             valarm.add('action', reminder.type)
-            valarm.add('trigger', reminder.trigger)
+            trigger_value, related, timezone = reminder_to_ical_trigger(reminder)
+            valarm.add('trigger', trigger_value)
+            if reminder.mode == "relative" and related:
+                valarm['trigger'].params['RELATED'] = related
+            if timezone:
+                valarm['trigger'].params['TZID'] = timezone
             
             if reminder.description:
                 valarm.add('description', reminder.description)

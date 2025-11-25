@@ -5,4 +5,3 @@
 # Nextcloud Configuration
 nextcloud:
   base_url: "https://nextcloud.example.com:8083"
-  api_proxy_url: "http://localhost:8560"

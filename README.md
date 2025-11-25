@@ -115,6 +115,12 @@ Individual modules can be invoked similarly, e.g. `python -m app.tests.test_cont
 
 ---
 
+## Roadmap
+
+- **Recurring event support**: expose structured recurrence editing (RRULE/EXDATE/RDATE) and instance overrides so clients can create and manage repeating meetings directly through the REST API.
+
+---
+
 ## Contributing
 
 Bug reports, docs fixes, and feature ideas are welcome—open an issue or reach out if you’d like to collaborate.
@@ -122,3 +128,13 @@ Bug reports, docs fixes, and feature ideas are welcome—open an issue or reach 
 ## License
 
 Released under the [MIT License](https://choosealicense.com/licenses/mit/) © harokku999@gmail.com (2025).
+
+---
+
+## Changelogs
+
+### 2025-11-25 — Reminder & Test Refactor
+- Added timezone-aware reminder handling so absolute alarms preserve TZIDs end-to-end.
+- Introduced shared reminder/timezone utility modules to keep CalDAV parsing/writing consistent.
+- Refactored CLI-style tests to use reusable API clients and helper modules, reducing boilerplate and improving maintainability.
+- Moved test-only configuration into dedicated support modules to decouple it from production settings.

@@ -73,7 +73,11 @@ def endpoint_error_handler(operation: str):
                         "reminders": [
                             {
                                 "type": "DISPLAY",
-                                "trigger": "2025-04-21T13:50:00",
+                                "mode": "relative",
+                                "offset": "-PT10M",
+                                "relation": "START",
+                                "fire_time": "2025-04-21T13:50:00",
+                                "timezone": "Europe/Paris",
                                 "description": "Reminder fires 10 minutes before start"
                             }
                         ]
@@ -191,11 +195,13 @@ async def read_event_endpoint(
     - **Privacy**: `classification` field mirroring the CalDAV CLASS value (PUBLIC/PRIVATE/CONFIDENTIAL)
     - **Metadata**: Creation/modification timestamps, server URL
     
-    **Reminder Trigger Format:**
-    Reminders returned by the GET endpoint expose their `trigger` value as an ISO 8601
-    timestamp representing the exact fire time (e.g., `2025-04-21T13:50:00`). Relative
-    durations from Nextcloud (such as `-PT10M`) are normalized to absolute timestamps
-    during parsing so downstream clients can show when the reminder will occur.
+    **Reminder Payload:**
+    Each reminder object includes a `mode` field (`absolute` or `relative`). Relative
+    reminders provide their ISO 8601 duration in `offset`, the reference point in
+    `relation` (START or END), and a computed `fire_time` convenience timestamp that
+    reflects the event's timezone. Absolute reminders define `fire_time` alongside a
+    `timezone` field, ensuring the API preserves the original TZID information from
+    Nextcloud.
     
     **Note:** When privacy mode is enabled, certain sensitive fields may be masked
     or omitted from the response to protect confidential information.
@@ -384,10 +390,10 @@ async def read_events_by_time_range_endpoint(
     - **Privacy**: `classification` value mirroring CalDAV CLASS (PUBLIC/PRIVATE/CONFIDENTIAL)
     - **Metadata**: Creation/modification timestamps, server URL
     
-    **Reminder Trigger Format:**
-    Each reminder includes a `trigger` expressed as an ISO 8601 timestamp that reflects
-    when the alarm will run. Relative durations are converted to absolute timestamps
-    based on the event start (or end when applicable) during parsing.
+    **Reminder Payload:**
+    Reminders include a `mode`, `offset` (when relative), `relation` (START/END), a
+    convenience `fire_time`, and a `timezone` field for absolute alarms so clients can
+    keep the precise TZID that Nextcloud stores in the ICS data.
     
     **Note:** When privacy mode is enabled, certain sensitive fields may be masked
     or omitted from the response to protect confidential information.
@@ -508,8 +514,12 @@ async def create_event_endpoint(
     - **Timing**: Start time (required), end time, all-day events, timezone
     - **Participants**: Attendees with roles, participation status, and contact info
     - **Organization**: Categories, organizer information, priority
-    - **Notifications**: Multiple reminders with different trigger times and types
+    - **Notifications**: Multiple reminders with relative offsets or absolute fire times
     - **Recurrence**: Recurring event patterns and exceptions
+
+    **Reminder Definition:**
+    - Use `mode="relative"` with `offset` (ISO 8601 duration) and `relation` to tie the reminder to START/END.
+    - Use `mode="absolute"` with `fire_time` and optional `timezone` (IANA TZID) for fixed timestamps so the server can round-trip the original alarm TZ.
     
     **UID Handling:**
     If no UID is provided in the request, a UUID4 will be automatically generated.

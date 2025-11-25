@@ -7,31 +7,19 @@ Manual API endpoint test script for the Nextcloud FastAPI app.
 Results are printed to stdout for manual inspection.
 """
 
-import requests
 import json
 import sys
 
-from src.common.config import UsersSettings # Import your config settings
-from src.common.sec import gen_basic_auth_header
 from src.models.contact import Contact
-from src.nextcloud.config import API_BASE_PROXY_URL
+from .support.contacts_client import ContactsApiClient
 
-settings = UsersSettings()
+contacts_client = ContactsApiClient()
 
 """ TESTING API ENDPOINTS """
 
-def test_get_all_contacts(is_debug=False):
+def run_get_all_contacts(is_debug=False):
     """Test the GET /contacts endpoint to retrieve all contacts."""
-    response = requests.get(
-        f"{API_BASE_PROXY_URL}/contacts",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": gen_basic_auth_header(
-                settings.USERS["test4me"].NEXTCLOUD_USERNAME,
-                settings.USERS["test4me"].NEXTCLOUD_PASSWORD
-            ),
-        },
-    )
+    response = contacts_client.list_contacts()
     if is_debug:
         print("### TEST GET ALL CONTACTS ###")
         print(f"Status Code: {response.status_code}")
@@ -46,7 +34,11 @@ def test_get_all_contacts(is_debug=False):
     return len(contacts)  # Return the number of contacts found
 
 
-def test_search_contacts(is_debug=False):
+def test_get_all_contacts(is_debug=False):
+    run_get_all_contacts(is_debug=is_debug)
+
+
+def run_search_contacts(is_debug=False):
     """Test the POST /contacts/search endpoint to search for contacts."""
     # Example search criteria - modify as needed
     search_criteria = {
@@ -61,17 +53,7 @@ def test_search_contacts(is_debug=False):
         "search_type": "anyof"  # "anyof" (OR logic) or "allof" (AND logic)
     }
     
-    response = requests.post(
-        f"{API_BASE_PROXY_URL}/contacts/search",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": gen_basic_auth_header(
-                settings.USERS["test4me"].NEXTCLOUD_USERNAME,
-                settings.USERS["test4me"].NEXTCLOUD_PASSWORD
-            ),
-        },
-        json=search_criteria
-    )
+    response = contacts_client.search_contacts(search_criteria)
     
     if is_debug:
         print("\n### TEST SEARCH CONTACTS ###")
@@ -89,7 +71,11 @@ def test_search_contacts(is_debug=False):
     return len(contacts)  # Return the number of contacts found
 
 
-def test_create_contact(is_debug=False):
+def test_search_contacts(is_debug=False):
+    run_search_contacts(is_debug=is_debug)
+
+
+def run_create_contact(is_debug=False):
     """Test the POST /contacts endpoint to create a new contact."""
     # Example contact data
     new_contact = {
@@ -126,17 +112,7 @@ def test_create_contact(is_debug=False):
         "groups": ["Test", "API"]
     }
     
-    response = requests.post(
-        f"{API_BASE_PROXY_URL}/contacts",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": gen_basic_auth_header(
-                settings.USERS["test4me"].NEXTCLOUD_USERNAME,
-                settings.USERS["test4me"].NEXTCLOUD_PASSWORD
-            ),
-        },
-        json=new_contact
-    )
+    response = contacts_client.create_contact(new_contact)
     if is_debug:
         print("\n### TEST CREATE CONTACT ###")
         print(f"Status Code: {response.status_code}")
@@ -153,7 +129,11 @@ def test_create_contact(is_debug=False):
     return created_contact
 
 
-def test_update_contact(contact=None, is_debug=False):
+def test_create_contact(is_debug=False):
+    run_create_contact(is_debug=is_debug)
+
+
+def run_update_contact(contact=None, is_debug=False):
     """Test the PUT /contacts/{uid} endpoint to update a contact."""
     if contact is None:
         if is_debug:
@@ -179,17 +159,7 @@ def test_update_contact(contact=None, is_debug=False):
     
     # Send the update request
     uid = contact.get("uid")
-    response = requests.put(
-        f"{API_BASE_PROXY_URL}/contacts/{uid}",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": gen_basic_auth_header(
-                settings.USERS["test4me"].NEXTCLOUD_USERNAME,
-                settings.USERS["test4me"].NEXTCLOUD_PASSWORD
-            ),
-        },
-        json=contact
-    )
+    response = contacts_client.update_contact(uid, contact)
     if is_debug:
         print("\n### TEST UPDATE CONTACT ###")
         print(f"Status Code: {response.status_code}")
@@ -207,7 +177,11 @@ def test_update_contact(contact=None, is_debug=False):
     return result
 
 
-def test_delete_contact(contact=None, is_debug=False):
+def test_update_contact(contact=None, is_debug=False):
+    run_update_contact(contact=contact, is_debug=is_debug)
+
+
+def run_delete_contact(contact=None, is_debug=False):
     """Test the DELETE /contacts/{uid} endpoint to delete a contact."""
     if contact is None:
         if is_debug:
@@ -224,16 +198,7 @@ def test_delete_contact(contact=None, is_debug=False):
         return None
     
     # Send the delete request
-    response = requests.delete(
-        f"{API_BASE_PROXY_URL}/contacts/{uid}",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": gen_basic_auth_header(
-                settings.USERS["test4me"].NEXTCLOUD_USERNAME,
-                settings.USERS["test4me"].NEXTCLOUD_PASSWORD
-            ),
-        }
-    )
+    response = contacts_client.delete_contact(uid)
     
     if is_debug:
         print("\n### TEST DELETE CONTACT ###")
@@ -248,7 +213,11 @@ def test_delete_contact(contact=None, is_debug=False):
     return contact
 
 
-def test_get_contact_by_uid(contact=None, is_debug=False):
+def test_delete_contact(contact=None, is_debug=False):
+    run_delete_contact(contact=contact, is_debug=is_debug)
+
+
+def run_get_contact_by_uid(contact=None, is_debug=False):
     """Test the GET /contacts/{uid} endpoint to retrieve a single contact by UID."""
     if contact is None:
         if is_debug:
@@ -265,16 +234,7 @@ def test_get_contact_by_uid(contact=None, is_debug=False):
         return None
     
     # Send the get request
-    response = requests.get(
-        f"{API_BASE_PROXY_URL}/contacts/{uid}",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": gen_basic_auth_header(
-                settings.USERS["test4me"].NEXTCLOUD_USERNAME,
-                settings.USERS["test4me"].NEXTCLOUD_PASSWORD
-            ),
-        }
-    )
+    response = contacts_client.get_contact(uid)
     
     if is_debug:
         print("\n### TEST GET CONTACT BY UID ###")
@@ -291,43 +251,45 @@ def test_get_contact_by_uid(contact=None, is_debug=False):
     return result
 
 
+def test_get_contact_by_uid(contact=None, is_debug=False):
+    run_get_contact_by_uid(contact=contact, is_debug=is_debug)
+
+
 # Run the tests
 if __name__ == "__main__":
-    num_all = test_get_all_contacts()
+    num_all = run_get_all_contacts()
     if num_all is None:
-        print(f"FAILURE: test_get_all_contacts returned None")
+        print("FAILURE: get_all_contacts test returned None")
         sys.exit(1)
-    print(f"SUCCESS: test_get_all_contacts returned {num_all} record(s)")
+    print(f"SUCCESS: get_all_contacts test returned {num_all} record(s)")
 
-    num = test_search_contacts()
+    num = run_search_contacts()
     if num is None:
-        print(f"FAILURE: test_search_contacts returned None")
+        print("FAILURE: search_contacts test returned None")
         sys.exit(1)
-    print(f"SUCCESS: test_search_contacts returned {num} record(s)")
+    print(f"SUCCESS: search_contacts test returned {num} record(s)")
 
-    created_contact = test_create_contact()
+    created_contact = run_create_contact()
     if created_contact is None:
-        print(f"FAILURE: test_create_contact not returned a created contact")
+        print("FAILURE: create_contact test did not return a created contact")
         sys.exit(1)
-    print(f"SUCCESS: test_create_contact returned contact with full_name: {created_contact.get('full_name')}")
+    print(f"SUCCESS: create_contact test returned contact with full_name: {created_contact.get('full_name')}")
 
-    # Test get_contact_by_uid with the created contact
-    retrieved_contact = test_get_contact_by_uid(created_contact)
+    retrieved_contact = run_get_contact_by_uid(created_contact)
     if retrieved_contact is None:
-        print(f"FAILURE: test_get_contact_by_uid did not return a contact")
+        print("FAILURE: get_contact_by_uid test did not return a contact")
         sys.exit(1)
-    print(f"SUCCESS: test_get_contact_by_uid returned contact with full_name: {retrieved_contact.get('full_name')}")
+    print(f"SUCCESS: get_contact_by_uid test returned contact with full_name: {retrieved_contact.get('full_name')}")
 
-    updated_contact = test_update_contact(created_contact)
+    updated_contact = run_update_contact(created_contact)
     if updated_contact is None:
-        print(f"FAILURE: test_update_contact not returned an updated contact")
+        print("FAILURE: update_contact test did not return an updated contact")
         sys.exit(1)
-    print(f"SUCCESS: test_update_contact returned updated contact with full_name: {updated_contact.get('full_name')}")
+    print(f"SUCCESS: update_contact test returned updated contact with full_name: {updated_contact.get('full_name')}")
 
-    # Test delete_contact with the updated contact
-    deleted_result = test_delete_contact(updated_contact)
+    deleted_result = run_delete_contact(updated_contact)
     if deleted_result is None:
-        print(f"FAILURE: test_delete_contact did not return a result")
+        print("FAILURE: delete_contact test did not return a result")
         sys.exit(1)
-    print(f"SUCCESS: test_delete_contact returned deleted contact with full_name: {deleted_result.get('full_name')}")
+    print(f"SUCCESS: delete_contact test returned deleted contact with full_name: {deleted_result.get('full_name')}")
 
