@@ -55,27 +55,20 @@ Comprehensive error management with appropriate HTTP status codes:
 - 503: Server communication errors
 """
 
-from fastapi import HTTPException
 from src.common.libs.helpers import gen_nxtcloud_url_addressbook
 from fastapi.security import HTTPBasicCredentials
 from src.common.sec import authenticate_with_nextcloud, gen_basic_auth_header
 from src.models.contact import Contact, ContactSearchCriteria
 from typing import List, Dict, Optional
-import aiohttp
 
-from src.nextcloud import API_ERR_CONNECTION_ERROR
 from src.nextcloud.libs.carddav_helpers import (
-    create_request_headers,
-    create_request_xml,
-    create_search_request_xml,
-    handle_response_status,
     parse_xml_response,
     parse_vcard_to_contact,
     contact_to_vcard,
-    create_vcard_headers,
     validate_and_correct_url,
     parse_contacts_from_response
 )
+from src.nextcloud.libs.dav_clients import CardDavClient
 from src import logger
 
 
@@ -118,30 +111,12 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
     logger.debug(f"get_all_contacts: carddav_url: {carddav_url}")
 
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
-    headers = create_request_headers(auth_header)
-    logger.debug(f"get_all_contacts: headers: {headers}")
+    client = CardDavClient(carddav_url, auth_header)
+    response_text = await client.report_addressbook()
 
-    xml_data = create_request_xml()
-    
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.request("REPORT", carddav_url, headers=headers, data=xml_data) as response:
-                status_code = response.status
-                response_text = await response.text()
-                
-                # Handle response status
-                handle_response_status(status_code, response_text)
-                
-                # Parse XML response
-                parsed_data = parse_xml_response(response_text)
-                
-                # Parse vCards to Contact objects using the shared helper function
-                contacts = parse_contacts_from_response(parsed_data, privacy)
-                
-                return contacts
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    parsed_data = parse_xml_response(response_text)
+    contacts = parse_contacts_from_response(parsed_data, privacy)
+    return contacts
 
 
 async def search_contacts(
@@ -185,32 +160,16 @@ async def search_contacts(
     # Convert the Pydantic model to a dictionary for the XML creation
     criteria_dict = search_criteria.to_dict()
     
-    # Create the XML request with search filters
-    xml_data = create_search_request_xml(criteria_dict, search_type)
+    client = CardDavClient(carddav_url, auth_header)
+    response_text = await client.search_addressbook(criteria_dict, search_type)
     
-    # Create request headers
-    headers = create_request_headers(auth_header)
+    # Parse XML response
+    parsed_data = parse_xml_response(response_text)
     
-    # Send the request and process the response
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.request("REPORT", carddav_url, headers=headers, data=xml_data) as response:
-                status_code = response.status
-                response_text = await response.text()
-                
-                # Handle response status
-                handle_response_status(status_code, response_text)
-                
-                # Parse XML response
-                parsed_data = parse_xml_response(response_text)
-                
-                # Parse vCards to Contact objects using the shared helper function
-                contacts = parse_contacts_from_response(parsed_data, privacy)
-                
-                return contacts
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    # Parse vCards to Contact objects using the shared helper function
+    contacts = parse_contacts_from_response(parsed_data, privacy)
+    
+    return contacts
 
 
 async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, addressbook_name: Optional[str] = None) -> Contact:
@@ -251,13 +210,14 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     # Ensure the carddav_url ends with a slash
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
     logger.debug(f"create_contact: carddav_url: {carddav_url}")
-    base_url = carddav_url if carddav_url.endswith('/') else f"{carddav_url}/"
+    auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CardDavClient(carddav_url, auth_header)
     
     # Create the contact filename with the UID
     contact_filename = f"{contact.uid}.vcf"
     
     # Join the URL properly
-    contact_url = f"{base_url}{contact_filename}"
+    contact_url = client.build_url(contact_filename)
     
     # Update the contact's url with the URL where it will be created (with validation)
     contact.url = validate_and_correct_url(contact_url)
@@ -267,31 +227,8 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     # Generate the vCard data with the updated url
     vcard_data = contact_to_vcard(contact)
     
-    # Create headers for the PUT request
-    headers = create_vcard_headers(gen_basic_auth_header(credentials.username, credentials.password))
-    
-    # Send the PUT request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.put(contact_url, headers=headers, data=vcard_data) as response:
-                status_code = response.status
-                response_text = await response.text()
-                
-                # Check for success (201 Created or 204 No Content)
-                if status_code not in (201, 204):
-                    # Special handling for 405 Method Not Allowed
-                    if status_code == 405:
-                        # This often happens when trying to create a contact in the wrong location
-                        error_message = f"Cannot create contact at this URL. The server responded: {response_text}"
-                        raise HTTPException(status_code=405, detail=error_message)
-                    else:
-                        # Handle other error responses
-                        handle_response_status(status_code, response_text)
-                               
-                return contact
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    await client.create_contact(contact_url, vcard_data)
+    return contact
 
 
 async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, addressbook_name: Optional[str] = None) -> Contact:
@@ -327,6 +264,7 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     logger.debug(f"update_contact: carddav_url: {carddav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CardDavClient(carddav_url, auth_header)
     # Ensure the contact has a UID
     if not contact.uid:
         raise ValueError("Contact must have a UID to be updated")
@@ -337,9 +275,8 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
         contact_url = contact.url
     else:
         # Construct a URL based on the carddav_url and UID
-        base_url = carddav_url if carddav_url.endswith('/') else f"{carddav_url}/"
         contact_filename = f"{contact.uid}.vcf"
-        contact_url = f"{base_url}{contact_filename}"
+        contact_url = client.build_url(contact_filename)
         
         # Update the contact's url if it wasn't already set (with validation)
         contact.url = validate_and_correct_url(contact_url)
@@ -349,34 +286,8 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     # Generate the vCard data with the updated url
     vcard_data = contact_to_vcard(contact)
     
-    # Create headers for the PUT request
-    headers = create_vcard_headers(auth_header)
-    
-    # Send the PUT request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.put(contact_url, headers=headers, data=vcard_data) as response:
-                status_code = response.status
-                response_text = await response.text()
-                
-                # Check for success (200 OK, 201 Created, or 204 No Content)
-                if status_code not in (200, 201, 204):
-                    # Special handling for 404 Not Found
-                    if status_code == 404:
-                        error_message = f"Contact not found at {contact_url}. The server responded: {response_text}"
-                        raise HTTPException(status_code=404, detail=error_message)
-                    # Special handling for 405 Method Not Allowed
-                    elif status_code == 405:
-                        error_message = f"Cannot update contact at this URL. The server responded: {response_text}"
-                        raise HTTPException(status_code=405, detail=error_message)
-                    else:
-                        # Handle other error responses
-                        handle_response_status(status_code, response_text)
-                
-                return contact
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    await client.update_contact(contact_url, vcard_data)
+    return contact
 
 
 async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressbook_name: Optional[str] = None) -> Dict[str, str]:
@@ -407,47 +318,19 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressboo
     logger.debug(f"delete_contact: carddav_url: {carddav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CardDavClient(carddav_url, auth_header)
     # Validate the UID
     if not uid:
         raise ValueError("Contact UID must be provided for deletion")
     
     # Construct the URL for the contact
-    base_url = carddav_url if carddav_url.endswith('/') else f"{carddav_url}/"
     contact_filename = f"{uid}.vcf"
-    contact_url = f"{base_url}{contact_filename}"
+    contact_url = client.build_url(contact_filename)
     
     logger.debug(f"Deleting contact at URL: {contact_url}")
     
-    # Create headers for the DELETE request
-    headers = {
-        "authorization": auth_header
-    }
-    
-    # Send the DELETE request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.delete(contact_url, headers=headers) as response:
-                status_code = response.status
-                response_text = await response.text()
-                
-                # Check for success (200 OK or 204 No Content)
-                if status_code not in (200, 204):
-                    # Special handling for 404 Not Found
-                    if status_code == 404:
-                        error_message = f"Contact not found at {contact_url}. The server responded: {response_text}"
-                        raise HTTPException(status_code=404, detail=error_message)
-                    # Special handling for 405 Method Not Allowed
-                    elif status_code == 405:
-                        error_message = f"Cannot delete contact at this URL. The server responded: {response_text}"
-                        raise HTTPException(status_code=405, detail=error_message)
-                    else:
-                        # Handle other error responses
-                        handle_response_status(status_code, response_text)
-                
-                return {"message": f"Contact with UID {uid} successfully deleted"}
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    await client.delete_contact(contact_url)
+    return {"message": f"Contact with UID {uid} successfully deleted"}
 
 
 async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addressbook_name: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Contact]:
@@ -480,41 +363,20 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addres
     logger.debug(f"get_contact_by_uid: carddav_url: {carddav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CardDavClient(carddav_url, auth_header)
     # Validate the UID
     if not uid:
         raise ValueError("Contact UID must be provided for retrieval")
     
     # Construct the URL for the contact
-    base_url = carddav_url if carddav_url.endswith('/') else f"{carddav_url}/"
     contact_filename = f"{uid}.vcf"
-    contact_url = f"{base_url}{contact_filename}"
+    contact_url = client.build_url(contact_filename)
     
     logger.debug(f"Retrieving contact at URL: {contact_url}")
     
-    # Create headers for the GET request
-    headers = {
-        "authorization": auth_header
-    }
+    vcard_text = await client.get_contact(contact_url)
+    if vcard_text is None:
+        return None
     
-    # Send the GET request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(contact_url, headers=headers) as response:
-                status_code = response.status
-                
-                # If contact not found, return None instead of raising an exception
-                if status_code == 404:
-                    return None
-                
-                response_text = await response.text()
-                
-                # Handle other error responses
-                if status_code != 200:
-                    handle_response_status(status_code, response_text)
-                
-                # Parse vCard data to Contact object
-                contact = parse_vcard_to_contact(response_text, contact_url, privacy)
-                return contact
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    contact = parse_vcard_to_contact(vcard_text, contact_url, privacy)
+    return contact

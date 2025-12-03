@@ -8,26 +8,20 @@ This module provides functions to interact with Nextcloud CalDAV events.
 It includes functionality to retrieve and search events from a Nextcloud server.
 """
 
-from fastapi import HTTPException
 from typing import Optional, List
-import aiohttp
 from fastapi.security import HTTPBasicCredentials
 
 from src.common.libs.helpers import gen_nxtcloud_url_calendar
 from src.common.sec import gen_basic_auth_header, authenticate_with_nextcloud
 from src.models.event import Event
-from src.nextcloud import API_ERR_CONNECTION_ERROR
 from src.nextcloud.libs.caldav_helpers import (
     parse_ical_to_event,
-    handle_caldav_response_status,
-    create_caldav_request_headers,
-    create_calendar_query_xml,
     parse_caldav_xml_response,
     event_to_ical,
-    create_caldav_event_headers,
     parse_events_from_response
 )
 from src.nextcloud.libs.carddav_helpers import validate_and_correct_url
+from src.nextcloud.libs.dav_clients import CalDavClient
 from src import logger
 
 async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Event]:
@@ -59,46 +53,22 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar
     logger.debug(f"get_event_by_uid: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CalDavClient(caldav_url, auth_header)
     # Validate the UID
     if not uid:
         raise ValueError("Event UID must be provided for retrieval")
     
     # Construct the URL for the event
-    # For CalDAV, the URL structure might be different from CardDAV
-    # Typically, it would be something like: /remote.php/dav/calendars/username/calendar_name/event_uid.ics
-    base_url = caldav_url if caldav_url.endswith('/') else f"{caldav_url}/"
     event_filename = f"{uid}.ics"
-    event_url = f"{base_url}{event_filename}"
+    event_url = client.build_url(event_filename)
     
     logger.debug(f"Retrieving event at URL: {event_url}")
     
-    # Create headers for the GET request
-    headers = {
-        "authorization": auth_header,
-        "Content-Type": "text/calendar; charset=utf-8"
-    }
+    ical_text = await client.get_event(event_url)
+    if ical_text is None:
+        return None
     
-    # Send the GET request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(event_url, headers=headers) as response:
-                status_code = response.status
-                
-                # If event not found, return None instead of raising an exception
-                if status_code == 404:
-                    return None
-                
-                response_text = await response.text()
-                
-                # Handle other error responses
-                if status_code != 200:
-                    handle_caldav_response_status(status_code, response_text)
-                
-                # Parse iCalendar data to dictionary
-                return parse_ical_to_event(response_text, event_url, privacy)
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    return parse_ical_to_event(ical_text, event_url, privacy)
 
 
 async def get_events_by_time_range(
@@ -136,47 +106,27 @@ async def get_events_by_time_range(
     logger.debug(f"get_events_by_time_range: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CalDavClient(caldav_url, auth_header)
     # Validate the datetime parameters
     if not start_datetime or not end_datetime:
         raise ValueError("Both start and end datetime must be provided")
     
-    # Ensure the URL ends with a slash
-    base_url = caldav_url if caldav_url.endswith('/') else f"{caldav_url}/"
+    logger.debug(f"Retrieving events between {start_datetime} and {end_datetime} from {client.base_url}")
     
-    logger.debug(f"Retrieving events between {start_datetime} and {end_datetime} from {base_url}")
+    response_text = await client.report_time_range(start_datetime, end_datetime)
     
-    # Create headers for the REPORT request
-    headers = create_caldav_request_headers(auth_header)
+    # Parse the XML response
+    calendar_items = parse_caldav_xml_response(response_text)
     
-    # Create the XML payload for the calendar-query with time range filter
-    xml_data = create_calendar_query_xml(start_datetime, end_datetime)
+    # Convert each calendar item to an Event object using the new helper function
+    events = parse_events_from_response(calendar_items, privacy)
     
-    # Send the REPORT request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.request("REPORT", base_url, headers=headers, data=xml_data) as response:
-                status_code = response.status
-                response_text = await response.text()
-                
-                # Handle error responses
-                if status_code != 207:  # 207 Multi-Status is the expected response
-                    handle_caldav_response_status(status_code, response_text)
-                
-                # Parse the XML response
-                calendar_items = parse_caldav_xml_response(response_text)
-                
-                # Convert each calendar item to an Event object using the new helper function
-                events = parse_events_from_response(calendar_items, privacy)
-                
-                # Sort events by start datetime
-                events.sort(key=lambda event: event.start if event.start else "")
-                
-                logger.debug(f"Sorted {len(events)} events by start datetime")
-                
-                return events
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    # Sort events by start datetime
+    events.sort(key=lambda event: event.start if event.start else "")
+    
+    logger.debug(f"Sorted {len(events)} events by start datetime")
+    
+    return events
 
 
 async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar_name: Optional[str] = None) -> Event:
@@ -208,6 +158,7 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
     logger.debug(f"create_event: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CalDavClient(caldav_url, auth_header)
     # Validate the event
     if not event.uid:
         # Generate a new UID if not provided
@@ -219,12 +170,9 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
     if not event.start:
         raise ValueError("Event start time is required")
     
-    # Ensure the URL ends with a slash
-    base_url = caldav_url if caldav_url.endswith('/') else f"{caldav_url}/"
-    
     # Construct the URL for the event
     event_filename = f"{event.uid}.ics"
-    event_url = f"{base_url}{event_filename}"
+    event_url = client.build_url(event_filename)
     
     logger.debug(f"Creating event at URL: {event_url}")
     
@@ -233,31 +181,14 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
     
     logger.debug(f"iCalendar data:\n{ical_data}")
     
-    # Create headers for the PUT request
-    headers = create_caldav_event_headers(auth_header)
+    await client.create_event(event_url, ical_data)
     
-    # Send the PUT request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.put(event_url, headers=headers, data=ical_data) as response:
-                status_code = response.status
-                
-                # If we get a response, try to read the body
-                response_text = await response.text() if response.content else ""
-                
-                # Handle error responses
-                if status_code not in (201, 204):  # 201 Created or 204 No Content are success codes
-                    handle_caldav_response_status(status_code, response_text)
-                
-                # Update the event URL with validation
-                event.url = validate_and_correct_url(event_url)
-                
-                logger.debug(f"Event created successfully with UID: {event.uid}")
-                
-                return event
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    # Update the event URL with validation
+    event.url = validate_and_correct_url(event_url)
+    
+    logger.debug(f"Event created successfully with UID: {event.uid}")
+    
+    return event
 
 
 async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar_name: Optional[str] = None) -> Event:
@@ -289,6 +220,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     logger.debug(f"update_event: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CalDavClient(caldav_url, auth_header)
     # Validate the event
     if not event.uid:
         raise ValueError("Event UID is required for updates")
@@ -299,12 +231,9 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     if not event.start:
         raise ValueError("Event start time is required")
     
-    # Ensure the URL ends with a slash
-    base_url = caldav_url if caldav_url.endswith('/') else f"{caldav_url}/"
-    
     # Construct the URL for the event
     event_filename = f"{event.uid}.ics"
-    event_url = f"{base_url}{event_filename}"
+    event_url = client.build_url(event_filename)
     
     logger.debug(f"Updating event at URL: {event_url}")
     
@@ -325,31 +254,14 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     
     logger.debug(f"iCalendar data for update:\n{ical_data}")
     
-    # Create headers for the PUT request
-    headers = create_caldav_event_headers(auth_header)
+    await client.update_event(event_url, ical_data)
     
-    # Send the PUT request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.put(event_url, headers=headers, data=ical_data) as response:
-                status_code = response.status
-                
-                # If we get a response, try to read the body
-                response_text = await response.text() if response.content else ""
-                
-                # Handle error responses
-                if status_code not in (200, 204):  # 200 OK or 204 No Content are success codes for updates
-                    handle_caldav_response_status(status_code, response_text)
-                
-                # Update the event URL (in case it changed) with validation
-                event.url = validate_and_correct_url(event_url)
-                
-                logger.debug(f"Event updated successfully with UID: {event.uid}")
-                
-                return event
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    # Update the event URL (in case it changed) with validation
+    event.url = validate_and_correct_url(event_url)
+    
+    logger.debug(f"Event updated successfully with UID: {event.uid}")
+    
+    return event
 
 
 async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None) -> bool:
@@ -380,16 +292,14 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
     logger.debug(f"delete_event: caldav_url: {caldav_url}")
     
     auth_header = gen_basic_auth_header(credentials.username, credentials.password)
+    client = CalDavClient(caldav_url, auth_header)
     # Validate the UID
     if not uid:
         raise ValueError("Event UID must be provided for deletion")
     
-    # Ensure the URL ends with a slash
-    base_url = caldav_url if caldav_url.endswith('/') else f"{caldav_url}/"
-    
     # Construct the URL for the event
     event_filename = f"{uid}.ics"
-    event_url = f"{base_url}{event_filename}"
+    event_url = client.build_url(event_filename)
     
     logger.debug(f"Deleting event at URL: {event_url}")
     
@@ -399,32 +309,10 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
         logger.debug(f"Event with UID {uid} not found, nothing to delete")
         return False
     
-    # Create headers for the DELETE request
-    headers = {
-        "authorization": auth_header
-    }
+    deleted = await client.delete_event(event_url)
+    if not deleted:
+        logger.debug(f"Event with UID {uid} not found on server")
+        return False
     
-    # Send the DELETE request
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.delete(event_url, headers=headers) as response:
-                status_code = response.status
-                
-                # If we get a response, try to read the body
-                response_text = await response.text() if response.content else ""
-                
-                # If event not found, return False
-                if status_code == 404:
-                    logger.debug(f"Event with UID {uid} not found on server")
-                    return False
-                
-                # Handle error responses
-                if status_code not in (200, 204):  # 200 OK or 204 No Content are success codes for deletion
-                    handle_caldav_response_status(status_code, response_text)
-                
-                logger.debug(f"Event deleted successfully with UID: {uid}")
-                
-                return True
-                
-        except aiohttp.ClientError as e:
-            raise HTTPException(status_code=500, detail=f"{API_ERR_CONNECTION_ERROR}: {str(e)}")
+    logger.debug(f"Event deleted successfully with UID: {uid}")
+    return True

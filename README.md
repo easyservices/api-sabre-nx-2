@@ -133,6 +133,11 @@ Released under the [MIT License](https://choosealicense.com/licenses/mit/) © ha
 
 ## Changelogs
 
+### 2025-12-01 — DAV Client Refactor
+- Introduced shared `CardDavClient`/`CalDavClient` helpers so the API modules no longer duplicate aiohttp plumbing.
+- Centralized header creation, XML payload generation, and response handling inside the new clients to simplify `contacts.py` and `events.py`.
+- Kept the existing parsing/masking helpers untouched, ensuring business logic remains consistent while the transport layer is cleaner.
+
 ### 2025-11-25 — Reminder & Test Refactor
 - Added timezone-aware reminder handling so absolute alarms preserve TZIDs end-to-end.
 - Introduced shared reminder/timezone utility modules to keep CalDAV parsing/writing consistent.
