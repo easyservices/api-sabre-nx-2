@@ -49,7 +49,6 @@ import uvicorn
 from starlette.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from src.common.add_proxy import CustomProxyHeadersMiddleware
-from src.common.sec import authenticate_with_nextcloud
 from src.common import security
 from fastapi_pagination import add_pagination
 from src import logger

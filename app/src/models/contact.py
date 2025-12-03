@@ -60,6 +60,7 @@ class Contact(BaseModel):
     uid: str = Field(..., description="Unique identifier for the contact")
     full_name: str = Field(..., description="Full name of the contact")
     url: Optional[str] = Field(None, description="URL of the vCard on the CardDAV server")
+    etag: Optional[str] = Field(None, description="Server-provided ETag used for concurrency control")
     emails: Optional[List[Email]] = Field(None, description="List of email addresses")
     phones: Optional[List[Phone]] = Field(None, description="List of phone numbers")
     addresses: Optional[List[Address]] = Field(None, description="List of physical addresses")

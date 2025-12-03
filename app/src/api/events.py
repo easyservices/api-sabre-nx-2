@@ -209,7 +209,7 @@ async def read_event_endpoint(
     logger.debug(f"Retrieving event with UID: {uid} with privacy mode: {privacy}")
     
     # Authenticate with Nextcloud
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     # Pass privacy flag down so helper can mask sensitive fields when requested
@@ -401,7 +401,7 @@ async def read_events_by_time_range_endpoint(
     logger.debug(f"Retrieving events between {start_datetime} and {end_datetime} with privacy mode: {privacy}")
     
     # Authenticate with Nextcloud
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     # CalDAV helper handles filtering plus optional privacy masking
@@ -546,7 +546,7 @@ async def create_event_endpoint(
     logger.debug(f"Received event to create: {event}")
     
     # Authenticate with Nextcloud
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     # Call the create_event function to create the event on the server
@@ -694,7 +694,7 @@ async def update_event_endpoint(
     logger.debug(f"Updating event with UID: {uid}")
     
     # Authenticate with Nextcloud
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     # Set the UID from the path if not provided in the event data
@@ -817,7 +817,7 @@ async def delete_event_endpoint(
     logger.debug(f"Deleting event with UID: {uid}")
     
     # Authenticate with Nextcloud
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     # Call the delete_event function to delete the event from the server

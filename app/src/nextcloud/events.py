@@ -11,6 +11,7 @@ It includes functionality to retrieve and search events from a Nextcloud server.
 from typing import Optional, List
 from fastapi.security import HTTPBasicCredentials
 
+from src.common.audit import record_change
 from src.common.libs.helpers import gen_nxtcloud_url_calendar
 from src.common.sec import gen_basic_auth_header, authenticate_with_nextcloud
 from src.models.event import Event
@@ -46,7 +47,7 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar
     """
     logger.debug(f"get_event_by_uid: retrieving event with UID: {uid} with privacy mode: {privacy}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
@@ -64,11 +65,11 @@ async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar
     
     logger.debug(f"Retrieving event at URL: {event_url}")
     
-    ical_text = await client.get_event(event_url)
+    ical_text, etag = await client.get_event(event_url)
     if ical_text is None:
         return None
     
-    return parse_ical_to_event(ical_text, event_url, privacy)
+    return parse_ical_to_event(ical_text, event_url, privacy, etag)
 
 
 async def get_events_by_time_range(
@@ -99,7 +100,7 @@ async def get_events_by_time_range(
     """
     logger.debug(f"get_events_by_time_range: retrieving events between {start_datetime} and {end_datetime} with privacy mode: {privacy}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
@@ -151,7 +152,7 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
     """
     logger.debug(f"create_event: received event to create: {event}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
@@ -181,7 +182,9 @@ async def create_event(credentials: HTTPBasicCredentials, event: Event, calendar
     
     logger.debug(f"iCalendar data:\n{ical_data}")
     
-    await client.create_event(event_url, ical_data)
+    new_etag = await client.create_event(event_url, ical_data)
+    event.etag = new_etag or event.etag
+    await record_change("event", event.uid, "create", None, event.model_dump())
     
     # Update the event URL with validation
     event.url = validate_and_correct_url(event_url)
@@ -213,7 +216,7 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     """
     logger.debug(f"update_event: updating event with UID: {event.uid}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
@@ -249,17 +252,23 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     if not event.created:
         event.created = existing_event.created
     
+    etag_to_use = event.etag or existing_event.etag
+    if not etag_to_use:
+        raise ValueError("Event ETag is required for updates")
+    
     # Convert the Event object to iCalendar format
     ical_data = event_to_ical(event)
     
     logger.debug(f"iCalendar data for update:\n{ical_data}")
     
-    await client.update_event(event_url, ical_data)
+    new_etag = await client.update_event(event_url, ical_data, etag=etag_to_use)
     
     # Update the event URL (in case it changed) with validation
     event.url = validate_and_correct_url(event_url)
+    event.etag = new_etag or etag_to_use
     
     logger.debug(f"Event updated successfully with UID: {event.uid}")
+    await record_change("event", event.uid, "update", existing_event.model_dump(), event.model_dump())
     
     return event
 
@@ -285,7 +294,7 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
     """
     logger.debug(f"delete_event: deleting event with UID: {uid}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     caldav_url = gen_nxtcloud_url_calendar(user_info['id'], calendar_name)
@@ -309,10 +318,11 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
         logger.debug(f"Event with UID {uid} not found, nothing to delete")
         return False
     
-    deleted = await client.delete_event(event_url)
+    deleted = await client.delete_event(event_url, etag=existing_event.etag)
     if not deleted:
         logger.debug(f"Event with UID {uid} not found on server")
         return False
     
     logger.debug(f"Event deleted successfully with UID: {uid}")
+    await record_change("event", uid, "delete", existing_event.model_dump(), None)
     return True

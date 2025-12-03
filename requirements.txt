@@ -2,6 +2,7 @@ aiohttp
 cachetools
 fastapi
 fastapi-pagination
+httpx
 icalendar
 pydantic>=2.0
 PyYAML

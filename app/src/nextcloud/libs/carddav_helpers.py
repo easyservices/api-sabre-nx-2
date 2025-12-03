@@ -98,18 +98,25 @@ def parse_xml_response(response_text: str) -> List[Dict[str, Any]]:
     
     for response_element in root.findall('.//{DAV:}response'):
         href_element = response_element.find('.//{DAV:}href')
+        etag_element = response_element.find('.//{DAV:}getetag')
         vcard_data_element = response_element.find('.//{urn:ietf:params:xml:ns:carddav}address-data')
         
         if vcard_data_element is not None and vcard_data_element.text:
             result.append({
                 'href': href_element.text if href_element is not None else None,
-                'vcard_data': vcard_data_element.text
+                'vcard_data': vcard_data_element.text,
+                'etag': etag_element.text if etag_element is not None else None,
             })
     
     return result
 
 
-def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Contact]:
+def parse_vcard_to_contact(
+    vcard_data: str,
+    href: Optional[str] = None,
+    privacy: Optional[bool] = False,
+    etag: Optional[str] = None,
+) -> Optional[Contact]:
     """
     Parse a vCard string into a Contact object.
     
@@ -298,6 +305,7 @@ def parse_vcard_to_contact(vcard_data: str, href: Optional[str] = None, privacy:
             phones=phones,
             addresses=addresses,
             url=href,
+            etag=etag,
             birthday=birthday,
             notes=notes,
             groups=groups
@@ -576,7 +584,7 @@ def parse_contacts_from_response(parsed_data: List[Dict[str, Any]], privacy: Opt
         if href:
             href = validate_and_correct_url(href)
         try:
-            contact = parse_vcard_to_contact(item['vcard_data'], href, privacy)
+            contact = parse_vcard_to_contact(item['vcard_data'], href, privacy, item.get('etag'))
             if contact:
                 contacts.append(contact)
             else:

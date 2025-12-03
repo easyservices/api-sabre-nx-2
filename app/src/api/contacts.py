@@ -110,7 +110,7 @@ async def create_contact_endpoint(
         logger.debug(f"Received contact to create: {contact}")
 
         # Authenticate with Nextcloud
-        user_info = authenticate_with_nextcloud(credentials)
+        user_info = await authenticate_with_nextcloud(credentials)
         logger.debug(f"User credentials: {user_info}")
         
         # Call the create_contact function to create the contact on the server
@@ -240,7 +240,7 @@ async def read_contact_endpoint(
         logger.debug(f"Retrieving contact with UID: {uid} with privacy mode: {privacy}")
         
         # Authenticate with Nextcloud
-        user_info = authenticate_with_nextcloud(credentials)
+        user_info = await authenticate_with_nextcloud(credentials)
         logger.debug(f"User credentials: {user_info}")
         
         # Call the get_contact_by_uid function to retrieve the contact from the server
@@ -391,7 +391,7 @@ async def update_contact_endpoint(
         logger.debug(f"Updating contact with UID: {uid}")
         
         # Authenticate with Nextcloud
-        user_info = authenticate_with_nextcloud(credentials)
+        user_info = await authenticate_with_nextcloud(credentials)
         logger.debug(f"User credentials: {user_info}")
         
         # Call the update_contact function to update the contact on the server
@@ -513,7 +513,7 @@ async def delete_contact_endpoint(
         logger.debug(f"Deleting contact with UID: {uid}")
         
         # Authenticate with Nextcloud
-        user_info = authenticate_with_nextcloud(credentials)
+        user_info = await authenticate_with_nextcloud(credentials)
         logger.debug(f"User credentials: {user_info}")
         
         # Call the delete_contact function to delete the contact from the server
@@ -639,7 +639,7 @@ async def get_all_contacts_endpoint(
     """
     logger.debug(f"Get all contacts with privacy mode: {privacy}")
 
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     try:
@@ -778,7 +778,7 @@ async def search_contacts_endpoint(
         logger.debug(f"Get contacts using search criterias: {search_criteria} with privacy mode: {privacy}")
 
         # Authenticate with Nextcloud
-        user_info = authenticate_with_nextcloud(credentials)
+        user_info = await authenticate_with_nextcloud(credentials)
         logger.debug(f"User credentials: {user_info}")
         
         contacts = await search_contacts(

@@ -56,7 +56,9 @@ Comprehensive error management with appropriate HTTP status codes:
 """
 
 from src.common.libs.helpers import gen_nxtcloud_url_addressbook
+from fastapi import HTTPException, status
 from fastapi.security import HTTPBasicCredentials
+from src.common.audit import record_change
 from src.common.sec import authenticate_with_nextcloud, gen_basic_auth_header
 from src.models.contact import Contact, ContactSearchCriteria
 from typing import List, Dict, Optional
@@ -104,7 +106,7 @@ async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: 
     """
     logger.debug(f"get_all_contacts: retrieving all contacts with privacy mode: {privacy}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
@@ -147,7 +149,7 @@ async def search_contacts(
     """
     logger.debug(f"search_contacts: searching contacts with criteria: {search_criteria} with privacy mode: {privacy}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
@@ -195,7 +197,7 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     """
     logger.debug(f"create_contact: received contact to create: {contact}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     # Ensure the contact has a UID
@@ -227,7 +229,9 @@ async def create_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     # Generate the vCard data with the updated url
     vcard_data = contact_to_vcard(contact)
     
-    await client.create_contact(contact_url, vcard_data)
+    etag = await client.create_contact(contact_url, vcard_data)
+    contact.etag = etag or contact.etag
+    await record_change("contact", contact.uid, "create", None, contact.model_dump())
     return contact
 
 
@@ -257,7 +261,7 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     """
     logger.debug(f"update_contact: updating contact with UID: {contact.uid}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
@@ -282,11 +286,24 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
         contact.url = validate_and_correct_url(contact_url)
 
     logger.debug(f"updating contact at URL: {contact_url}")
+
+    existing_vcard, existing_etag = await client.get_contact(contact_url)
+    if existing_vcard is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Contact with UID {contact.uid} not found")
+
+    previous_contact = parse_vcard_to_contact(existing_vcard, contact_url, False, existing_etag)
+    etag_to_use = contact.etag or (previous_contact.etag if previous_contact else existing_etag)
+    if not etag_to_use:
+        raise HTTPException(status_code=status.HTTP_412_PRECONDITION_FAILED, detail="Missing ETag for contact update")
     
     # Generate the vCard data with the updated url
     vcard_data = contact_to_vcard(contact)
     
-    await client.update_contact(contact_url, vcard_data)
+    new_etag = await client.update_contact(contact_url, vcard_data, etag=etag_to_use)
+    contact.etag = new_etag or etag_to_use
+
+    if previous_contact:
+        await record_change("contact", contact.uid, "update", previous_contact.model_dump(), contact.model_dump())
     return contact
 
 
@@ -311,7 +328,7 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressboo
     """
     logger.debug(f"delete_contact: deleting contact with UID: {uid}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
@@ -328,8 +345,15 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressboo
     contact_url = client.build_url(contact_filename)
     
     logger.debug(f"Deleting contact at URL: {contact_url}")
-    
-    await client.delete_contact(contact_url)
+
+    existing_vcard, existing_etag = await client.get_contact(contact_url)
+    if existing_vcard is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Contact with UID {uid} not found")
+
+    previous_contact = parse_vcard_to_contact(existing_vcard, contact_url, False, existing_etag)
+    await client.delete_contact(contact_url, etag=previous_contact.etag if previous_contact else existing_etag)
+    if previous_contact:
+        await record_change("contact", uid, "delete", previous_contact.model_dump(), None)
     return {"message": f"Contact with UID {uid} successfully deleted"}
 
 
@@ -356,7 +380,7 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addres
     """
     logger.debug(f"get_contact_by_uid: retrieving contact with UID: {uid} with privacy mode: {privacy}")
         
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     
     carddav_url = gen_nxtcloud_url_addressbook(user_info['id'], addressbook_name)
@@ -374,9 +398,9 @@ async def get_contact_by_uid(credentials: HTTPBasicCredentials, uid: str, addres
     
     logger.debug(f"Retrieving contact at URL: {contact_url}")
     
-    vcard_text = await client.get_contact(contact_url)
+    vcard_text, etag = await client.get_contact(contact_url)
     if vcard_text is None:
         return None
     
-    contact = parse_vcard_to_contact(vcard_text, contact_url, privacy)
+    contact = parse_vcard_to_contact(vcard_text, contact_url, privacy, etag)
     return contact

@@ -133,6 +133,11 @@ Released under the [MIT License](https://choosealicense.com/licenses/mit/) © ha
 
 ## Changelogs
 
+### 2026-01-30 — Async Auth & Optimistic Locking
+- Replaced the blocking `requests`-based Nextcloud auth check with an async `httpx` client, plus retry/backoff and a circuit breaker to keep the API responsive when OCS hiccups.
+- Added pooled aiohttp sessions with configurable timeouts/proxy support so CardDAV/CalDAV calls reuse connections instead of rebuilding TLS handshakes per request.
+- Surfaced ETag metadata through the models and send `If-Match` headers on writes to prevent silent contact/event overwrites; every mutation now records a JSONL audit entry for rollback debugging.
+
 ### 2025-12-01 — DAV Client Refactor
 - Introduced shared `CardDavClient`/`CalDavClient` helpers so the API modules no longer duplicate aiohttp plumbing.
 - Centralized header creation, XML payload generation, and response handling inside the new clients to simplify `contacts.py` and `events.py`.

@@ -1,43 +1,15 @@
 # Copyright (c) 2025 harokku999@gmail.com
 # Licensed under the MIT License - https://opensource.org/licenses/MIT
 
-"""
-Security and Authentication Module
+"""Security helpers for authenticating against Nextcloud."""
 
-This module provides comprehensive security utilities for authentication and authorization
-in the Nextcloud FastAPI application. It handles HTTP Basic Authentication, credential
-validation, and secure communication with Nextcloud servers.
-
-**Key Components:**
-- **Authentication Cache**: TTL-based caching for validated credentials
-- **Nextcloud Integration**: Direct authentication validation with Nextcloud OCS API
-- **Header Generation**: HTTP Basic Authentication header creation utilities
-- **Error Handling**: Proper HTTP status codes for authentication failures
-
-**Security Features:**
-- **Credential Caching**: Reduces authentication overhead with time-based cache
-- **Secure Validation**: Direct verification against Nextcloud user database
-- **RFC Compliance**: HTTP Basic Authentication per RFC 7617 standards
-- **Error Isolation**: Proper exception handling for authentication failures
-
-**Cache Management:**
-The authentication cache stores validated credentials for 5 minutes (300 seconds)
-with a maximum of 100 concurrent users to balance performance and security.
-
-**Integration Points:**
-- FastAPI dependency injection for endpoint authentication
-- Nextcloud OCS API for user validation
-- CardDAV/CalDAV operations requiring authenticated requests
-
-**Usage:**
-This module is primarily used as a dependency in FastAPI endpoints to ensure
-all API operations are performed with valid Nextcloud credentials.
-"""
-
+import asyncio
 import base64
+import os
+import time
 
+import httpx
 from fastapi import HTTPException, status
-import requests
 from fastapi.security import HTTPBasicCredentials
 from src.nextcloud.config import NEXTCLOUD_BASE_URL
 from cachetools import TTLCache
@@ -46,12 +18,50 @@ from src import logger
 # Cache with max 100 users, 300 seconds (5 min) TTL
 auth_cache = TTLCache(maxsize=100, ttl=300)
 
+# Circuit breaker / retry controls (configurable through env vars)
+AUTH_TIMEOUT = float(os.getenv("NEXTCLOUD_AUTH_TIMEOUT", "10"))
+AUTH_CONNECT_TIMEOUT = float(os.getenv("NEXTCLOUD_AUTH_CONNECT_TIMEOUT", "5"))
+AUTH_MAX_RETRIES = int(os.getenv("NEXTCLOUD_AUTH_MAX_RETRIES", "3"))
+AUTH_BACKOFF = float(os.getenv("NEXTCLOUD_AUTH_BACKOFF", "0.6"))
+AUTH_CIRCUIT_THRESHOLD = int(os.getenv("NEXTCLOUD_AUTH_CIRCUIT_THRESHOLD", "5"))
+AUTH_CIRCUIT_RESET = float(os.getenv("NEXTCLOUD_AUTH_CIRCUIT_RESET", "30"))
+AUTH_PROXY = os.getenv("NEXTCLOUD_AUTH_PROXY")
+
+_circuit_lock = asyncio.Lock()
+_circuit_state = {"failures": 0, "open_until": 0.0}
+
 
 def cache_key(credentials: HTTPBasicCredentials) -> str:
     return f"{credentials.username}:{credentials.password}"
 
 
-def authenticate_with_nextcloud(credentials: HTTPBasicCredentials):
+async def _ensure_circuit_allows_request() -> None:
+    """Prevent outbound calls when the breaker is open."""
+    async with _circuit_lock:
+        now = time.monotonic()
+        open_until = _circuit_state.get("open_until", 0.0)
+        if open_until and now < open_until:
+            raise HTTPException(status_code=503, detail="Nextcloud auth temporarily unavailable")
+        if open_until and now >= open_until:
+            _circuit_state["open_until"] = 0.0
+            _circuit_state["failures"] = 0
+
+
+async def _record_success() -> None:
+    async with _circuit_lock:
+        _circuit_state["failures"] = 0
+        _circuit_state["open_until"] = 0.0
+
+
+async def _record_failure() -> None:
+    async with _circuit_lock:
+        _circuit_state["failures"] += 1
+        if _circuit_state["failures"] >= AUTH_CIRCUIT_THRESHOLD:
+            _circuit_state["open_until"] = time.monotonic() + AUTH_CIRCUIT_RESET
+            _circuit_state["failures"] = 0
+
+
+async def authenticate_with_nextcloud(credentials: HTTPBasicCredentials):
     """
     Authenticate user credentials against Nextcloud server.
     
@@ -93,29 +103,78 @@ def authenticate_with_nextcloud(credentials: HTTPBasicCredentials):
         from fastapi.security import HTTPBasicCredentials
         
         creds = HTTPBasicCredentials(username="user", password="pass")
-        user_info = authenticate_with_nextcloud(creds)
+        user_info = await authenticate_with_nextcloud(creds)
         logger.debug(f"Authenticated user: {user_info['id']}")
         ```
     """
     key = cache_key(credentials)
 
-    # Return from cache if available
     if key in auth_cache:
         return auth_cache[key]
 
-    # Authenticate with Nextcloud
+    await _ensure_circuit_allows_request()
+
     url = f"{NEXTCLOUD_BASE_URL}/ocs/v2.php/cloud/user?format=json"
     headers = {"OCS-APIRequest": "true"}
-    response = requests.get(url, auth=(credentials.username, credentials.password), headers=headers)
+    timeout = httpx.Timeout(AUTH_TIMEOUT, connect=AUTH_CONNECT_TIMEOUT)
+    attempt = 0
 
-    if response.status_code == 200:
-        user_info = response.json()["ocs"]["data"]
-        auth_cache[key] = user_info  # Cache successful auth
-        return user_info
-    elif response.status_code == 401:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    else:
-        raise HTTPException(status_code=500, detail="Nextcloud auth failed")
+    while True:
+        attempt += 1
+        try:
+            client_kwargs = {"timeout": timeout}
+            transport = None
+            if AUTH_PROXY:
+                transport = httpx.AsyncHTTPTransport(proxy=AUTH_PROXY)
+                client_kwargs["transport"] = transport
+            async with httpx.AsyncClient(**client_kwargs) as client:
+                response = await client.get(
+                    url,
+                    auth=(credentials.username, credentials.password),
+                    headers=headers,
+                )
+
+            if response.status_code == 200:
+                user_info = response.json()["ocs"]["data"]
+                auth_cache[key] = user_info
+                await _record_success()
+                return user_info
+
+            if response.status_code == 401:
+                await _record_success()
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+            if response.status_code >= 500:
+                await _record_failure()
+                if attempt > AUTH_MAX_RETRIES:
+                    raise HTTPException(status_code=503, detail="Nextcloud auth temporarily unavailable")
+                backoff = AUTH_BACKOFF * attempt
+                logger.warning(
+                    "Nextcloud auth failed with %s (attempt %s/%s), retrying in %.2fs",
+                    response.status_code,
+                    attempt,
+                    AUTH_MAX_RETRIES,
+                    backoff,
+                )
+                await asyncio.sleep(backoff)
+                continue
+
+            await _record_success()
+            raise HTTPException(status_code=response.status_code, detail="Nextcloud auth failed")
+
+        except httpx.RequestError as exc:
+            await _record_failure()
+            if attempt > AUTH_MAX_RETRIES:
+                raise HTTPException(status_code=503, detail=f"Nextcloud auth unavailable: {exc}") from exc
+            backoff = AUTH_BACKOFF * attempt
+            logger.warning(
+                "Nextcloud auth request error (attempt %s/%s): %s. Retrying in %.2fs",
+                attempt,
+                AUTH_MAX_RETRIES,
+                exc,
+                backoff,
+            )
+            await asyncio.sleep(backoff)
 
 
 def gen_basic_auth_header(username: str, password: str) -> str:

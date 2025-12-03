@@ -26,7 +26,12 @@ from src.reminders.utils import (
     reminder_to_ical_trigger,
 )
 
-def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] = False) -> Event:
+def parse_ical_to_event(
+    ical_data: str,
+    event_url: str,
+    privacy: Optional[bool] = False,
+    etag: Optional[str] = None,
+) -> Event:
     """
     Parse iCalendar data into an Event object.
     
@@ -91,6 +96,7 @@ def parse_ical_to_event(ical_data: str, event_url: str, privacy: Optional[bool] 
                         description=description,
                         location=str(component.get("LOCATION", "")) if component.get("LOCATION") else None,
                         url=validate_and_correct_url(event_url) if event_url else None,
+                        etag=etag,
                         status=str(component.get("STATUS", "")) if component.get("STATUS") else None,
                         classification=classification,
                         organizer=str(component.get("ORGANIZER", "")).replace("mailto:", "") if component.get("ORGANIZER") else None,
@@ -363,12 +369,14 @@ def parse_caldav_xml_response(response_text: str) -> List[Dict[str, Any]]:
     
     for response_element in root.findall('.//{DAV:}response'):
         href_element = response_element.find('.//{DAV:}href')
+        etag_element = response_element.find('.//{DAV:}getetag')
         calendar_data_element = response_element.find('.//{urn:ietf:params:xml:ns:caldav}calendar-data')
         
         if calendar_data_element is not None and calendar_data_element.text:
             result.append({
                 'href': href_element.text if href_element is not None else None,
-                'calendar_data': calendar_data_element.text
+                'calendar_data': calendar_data_element.text,
+                'etag': etag_element.text if etag_element is not None else None,
             })
     
     return result
@@ -554,7 +562,7 @@ def parse_events_from_response(parsed_data: List[Dict[str, Any]], privacy: Optio
         if href:
             href = validate_and_correct_url(href)
         try:
-            event = parse_ical_to_event(item['calendar_data'], href, privacy)
+            event = parse_ical_to_event(item['calendar_data'], href, privacy, item.get('etag'))
             if event:
                 events.append(event)
             else:

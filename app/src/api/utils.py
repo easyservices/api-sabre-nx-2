@@ -73,6 +73,6 @@ async def get_status(credentials: HTTPBasicCredentials = Depends(security)):
     Returns a simple status object indicating the server is operational
     and can successfully authenticate with Nextcloud.
     """
-    user_info = authenticate_with_nextcloud(credentials)
+    user_info = await authenticate_with_nextcloud(credentials)
     logger.debug(f"User credentials: {user_info}")
     return {"status": "running"}
