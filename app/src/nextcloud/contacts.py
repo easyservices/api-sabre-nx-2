@@ -61,7 +61,7 @@ from fastapi.security import HTTPBasicCredentials
 from src.common.audit import record_change
 from src.common.sec import authenticate_with_nextcloud, gen_basic_auth_header
 from src.models.contact import Contact, ContactSearchCriteria
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from src.nextcloud.libs.carddav_helpers import (
     parse_xml_response,
@@ -72,6 +72,38 @@ from src.nextcloud.libs.carddav_helpers import (
 )
 from src.nextcloud.libs.dav_clients import CardDavClient
 from src import logger
+
+
+async def _raise_contact_conflict(
+    client: CardDavClient,
+    contact_url: str,
+    uid: str,
+    attempted_state: Optional[Dict[str, Any]],
+) -> None:
+    """
+    Fetch the latest contact snapshot and raise a 412 with useful metadata.
+    """
+    latest_contact = None
+    latest_vcard, latest_etag = await client.get_contact(contact_url)
+    if latest_vcard:
+        latest_contact = parse_vcard_to_contact(latest_vcard, contact_url, False, latest_etag)
+
+    current_payload = latest_contact.model_dump() if latest_contact else None
+    await record_change(
+        "contact",
+        uid,
+        "conflict",
+        current_payload,
+        attempted_state,
+    )
+
+    raise HTTPException(
+        status_code=status.HTTP_412_PRECONDITION_FAILED,
+        detail={
+            "message": "Contact was modified by another client. Refresh and retry with the latest payload.",
+            "current": current_payload,
+        },
+    )
 
 
 async def get_all_contacts(credentials: HTTPBasicCredentials, addressbook_name: Optional[str] = None, privacy: Optional[bool] = False) -> List[Contact]:
@@ -299,7 +331,13 @@ async def update_contact(credentials: HTTPBasicCredentials, contact: Contact, ad
     # Generate the vCard data with the updated url
     vcard_data = contact_to_vcard(contact)
     
-    new_etag = await client.update_contact(contact_url, vcard_data, etag=etag_to_use)
+    try:
+        new_etag = await client.update_contact(contact_url, vcard_data, etag=etag_to_use)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_412_PRECONDITION_FAILED:
+            await _raise_contact_conflict(client, contact_url, contact.uid, contact.model_dump())
+        raise
+
     contact.etag = new_etag or etag_to_use
 
     if previous_contact:
@@ -351,7 +389,13 @@ async def delete_contact(credentials: HTTPBasicCredentials, uid: str, addressboo
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Contact with UID {uid} not found")
 
     previous_contact = parse_vcard_to_contact(existing_vcard, contact_url, False, existing_etag)
-    await client.delete_contact(contact_url, etag=previous_contact.etag if previous_contact else existing_etag)
+    try:
+        await client.delete_contact(contact_url, etag=previous_contact.etag if previous_contact else existing_etag)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_412_PRECONDITION_FAILED:
+            await _raise_contact_conflict(client, contact_url, uid, {"deleted": True})
+        raise
+
     if previous_contact:
         await record_change("contact", uid, "delete", previous_contact.model_dump(), None)
     return {"message": f"Contact with UID {uid} successfully deleted"}

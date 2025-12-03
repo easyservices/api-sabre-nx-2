@@ -8,7 +8,8 @@ This module provides functions to interact with Nextcloud CalDAV events.
 It includes functionality to retrieve and search events from a Nextcloud server.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
+from fastapi import HTTPException, status
 from fastapi.security import HTTPBasicCredentials
 
 from src.common.audit import record_change
@@ -24,6 +25,38 @@ from src.nextcloud.libs.caldav_helpers import (
 from src.nextcloud.libs.carddav_helpers import validate_and_correct_url
 from src.nextcloud.libs.dav_clients import CalDavClient
 from src import logger
+
+
+async def _raise_event_conflict(
+    client: CalDavClient,
+    event_url: str,
+    uid: str,
+    attempted_state: Optional[Dict[str, Any]],
+) -> None:
+    """
+    Fetch the latest event snapshot and raise a conflict with payload metadata.
+    """
+    latest_event = None
+    latest_ical, latest_etag = await client.get_event(event_url)
+    if latest_ical:
+        latest_event = parse_ical_to_event(latest_ical, event_url, False, latest_etag)
+
+    current_payload = latest_event.model_dump() if latest_event else None
+    await record_change(
+        "event",
+        uid,
+        "conflict",
+        current_payload,
+        attempted_state,
+    )
+
+    raise HTTPException(
+        status_code=status.HTTP_412_PRECONDITION_FAILED,
+        detail={
+            "message": "Event was modified by another client. Refresh and retry with the latest payload.",
+            "current": current_payload,
+        },
+    )
 
 async def get_event_by_uid(credentials: HTTPBasicCredentials, uid: str, calendar_name: Optional[str] = None, privacy: Optional[bool] = False) -> Optional[Event]:
     """
@@ -261,7 +294,12 @@ async def update_event(credentials: HTTPBasicCredentials, event: Event, calendar
     
     logger.debug(f"iCalendar data for update:\n{ical_data}")
     
-    new_etag = await client.update_event(event_url, ical_data, etag=etag_to_use)
+    try:
+        new_etag = await client.update_event(event_url, ical_data, etag=etag_to_use)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_412_PRECONDITION_FAILED:
+            await _raise_event_conflict(client, event_url, event.uid, event.model_dump())
+        raise
     
     # Update the event URL (in case it changed) with validation
     event.url = validate_and_correct_url(event_url)
@@ -318,7 +356,13 @@ async def delete_event(credentials: HTTPBasicCredentials, uid: str, calendar_nam
         logger.debug(f"Event with UID {uid} not found, nothing to delete")
         return False
     
-    deleted = await client.delete_event(event_url, etag=existing_event.etag)
+    try:
+        deleted = await client.delete_event(event_url, etag=existing_event.etag)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_412_PRECONDITION_FAILED:
+            await _raise_event_conflict(client, event_url, uid, {"deleted": True})
+        raise
+
     if not deleted:
         logger.debug(f"Event with UID {uid} not found on server")
         return False
