@@ -142,7 +142,11 @@ async def authenticate_with_nextcloud(credentials: HTTPBasicCredentials):
 
             if response.status_code == 401:
                 await _record_success()
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid credentials",
+                    headers={"WWW-Authenticate": 'Basic realm="Nextcloud"'},
+                )
 
             if response.status_code >= 500:
                 await _record_failure()

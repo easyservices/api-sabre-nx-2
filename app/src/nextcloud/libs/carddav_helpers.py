@@ -72,7 +72,11 @@ def handle_response_status(status_code: int, response_text: str) -> None:
         HTTPException: For authentication, authorization, server, or parsing errors.
     """
     if status_code == 401:
-        raise HTTPException(status_code=401, detail=API_ERR_AUTH_FAILED)
+        raise HTTPException(
+            status_code=401,
+            detail=API_ERR_AUTH_FAILED,
+            headers={"WWW-Authenticate": 'Basic realm="Nextcloud"'},
+        )
     if status_code == 403:
         raise HTTPException(status_code=403, detail=API_ERR_AUTH_REFUSED)
     if status_code == 404:

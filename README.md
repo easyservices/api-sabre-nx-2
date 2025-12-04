@@ -133,6 +133,10 @@ Released under the [MIT License](https://choosealicense.com/licenses/mit/) © ha
 
 ## Changelogs
 
+### 2026-02-10 — Standards-Compliant Basic Auth
+- Added the `WWW-Authenticate: Basic realm="Nextcloud"` header to every `401 Unauthorized` emitted by the security layer and DAV helpers so browsers and API clients automatically re-prompt per RFC 7617.
+- Centralized the same header for both CalDAV and CardDAV error helpers to ensure a consistent challenge whether the failure happens in generic auth, event sync, or contact sync flows.
+
 ### 2026-01-30 — Async Auth & Optimistic Locking
 - Replaced the blocking `requests`-based Nextcloud auth check with an async `httpx` client, plus retry/backoff and a circuit breaker to keep the API responsive when OCS hiccups.
 - Added pooled aiohttp sessions with configurable timeouts/proxy support so CardDAV/CalDAV calls reuse connections instead of rebuilding TLS handshakes per request.

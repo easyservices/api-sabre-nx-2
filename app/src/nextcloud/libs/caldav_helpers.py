@@ -281,7 +281,11 @@ def handle_caldav_response_status(status_code: int, response_text: str) -> None:
         HTTPException: For authentication, authorization, server, or parsing errors.
     """
     if status_code == 401:
-        raise HTTPException(status_code=401, detail="Authentication failed")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication failed",
+            headers={"WWW-Authenticate": 'Basic realm="Nextcloud"'},
+        )
     if status_code == 403:
         raise HTTPException(status_code=403, detail="Access forbidden")
     if status_code == 404:
