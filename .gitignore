@@ -1,0 +1,21 @@
+# Nextcloud App Password Manager .gitignore
+
+# Python
+__pycache__/
+.pytest*
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Logs
+*.log
+logs/
+
+# Local configuration
+.env
+
+*.service

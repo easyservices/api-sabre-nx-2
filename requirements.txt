@@ -1,0 +1,16 @@
+aiohttp
+cachetools
+fastapi
+fastapi-pagination
+icalendar
+pydantic>=2.0
+pydantic-settings
+PyYAML
+requests
+httpx
+caldav
+carddav
+starlette
+uvicorn
+vobject
+python-dotenv
